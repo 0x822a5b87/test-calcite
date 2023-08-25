@@ -7,6 +7,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSpecialOperator;
+import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 import javax.annotation.Nonnull;
@@ -39,7 +40,7 @@ public class SqlColMapping extends SqlCall {
     @Nonnull
     @Override
     public SqlOperator getOperator() {
-        //TODO 实现逻辑
+        // TODO 实现逻辑
         return null;
     }
 
@@ -48,5 +49,12 @@ public class SqlColMapping extends SqlCall {
     public List<SqlNode> getOperandList() {
         //TODO 实现逻辑
         return null;
+    }
+
+    @Override
+    public void unparse(SqlWriter writer, int leftPrec, int rightPrec) {
+        fromCol.unparse(writer, leftPrec, rightPrec);
+        writer.print(" ");
+        toCol.unparse(writer, leftPrec, rightPrec);
     }
 }
