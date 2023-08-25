@@ -23,5 +23,6 @@
 hs_err_pid*
 
 06-parser-example/generated-sources/*
+06-calcite-parser-example/generated-sources/*
 
 *.iml
