@@ -3,6 +3,7 @@ package com.xxx.ch05;
 import org.apache.calcite.avatica.jdbc.JdbcMeta;
 import org.apache.calcite.avatica.remote.LocalService;
 import org.apache.calcite.avatica.server.HttpServer;
+import org.apache.calcite.sql.SqlNode;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
