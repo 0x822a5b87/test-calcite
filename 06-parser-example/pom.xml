@@ -9,10 +9,11 @@
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>06-antlr-parser-demo</artifactId>
+    <artifactId>06-parser-example</artifactId>
 
     <build>
         <plugins>
+            <!-- 通过 javacc-maven-plugin 在 phase javacc 编译生成文件到 generated-sources -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>javacc-maven-plugin</artifactId>
@@ -37,25 +38,28 @@
                 </executions>
             </plugin>
 
+            <!-- 将 generated-sources 也添加到我们的源文件目录中 -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
-                <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                    <generatedSourcesDirectory>${project.build.directory}/generated-sources/javacc</generatedSourcesDirectory>
-                </configuration>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
                 <executions>
                     <execution>
-                        <id>default-compile</id>
-                        <phase>compile</phase>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
                         <goals>
-                            <goal>compile</goal>
+                            <goal>add-source</goal>
                         </goals>
+                        <configuration>
+                            <sources>
+                                <source>${basedir}/src/main/java/</source>
+                                <source>${basedir}/generated-sources/</source>
+                            </sources>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
         <resources>
             <resource>
