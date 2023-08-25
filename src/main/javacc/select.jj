@@ -1,0 +1,120 @@
+options {
+    IGNORE_CASE = true;
+    // 允许被多次初始化
+    STATIC = false;
+}
+
+// PARSER 声明是 PARSER_BEGIN 和 PARSER_END 之间的部分
+PARSER_BEGIN(SimpleSelectParser)
+
+package com.xxx;
+
+import java.io.* ;
+
+// PARSER 是纯java代码
+public class SimpleSelectParser {
+    private String sql;
+
+    // 解析sql
+    public void parse() throws ParseException {
+        SelectExpr(sql);
+    }
+
+    // 构造器，在我们定义的构造器中，我们将输入字符当做等待解析的sql
+    public SimpleSelectParser(String expr) {
+        this((Reader)(new StringReader(expr)));
+        this.sql = expr;
+    }
+    public static void main(String[] args) throws Exception{
+        final SimpleSelectParser parser = new SimpleSelectParser(String.join(" ", args));
+        parser.parse();
+    }
+}
+PARSER_END(SimpleSelectParser)
+
+// 声明解析逻辑方法
+// JavaCC 可以支持使用原生的java代码，原生的java代码以JAVACODE开头
+// 也可以使用 JavaCC 语法，JavaCC语法如下
+// ReturnType FunctionName(params) :
+// {
+//      variable_declare;
+// }
+// {
+//      statement;
+// }
+void SelectExpr(String sql) :
+{
+    // 声明 res 变量
+    int res;
+}
+{
+    // sql 以 select 开始
+    <SELECT>
+    // 调用 JavaCC 中定义的 Expression 方法，并复制给 res
+    res = Expression()
+    {
+        // 输出结果
+        System.out.println(sql + "=" + res);
+    } }
+
+int Expression() :
+{
+    // 定义变量 res 和 v
+    int res = 0;
+    int v;
+}
+{
+    // 调用Number()方法并赋值给res
+    res = Number()
+    // 这里是 ()*， 代表括号内的值可以有一个或者多个的出现
+    (
+        //进入add部分
+        <ADD>
+        v = Number()
+        {res += v;}
+
+    // 可能是加或者减
+    |
+        //进入sub部分
+        <SUB>
+        v = Number()
+        {res -= v;}
+    )*
+    // 返回结果
+    {return res;}
+}
+
+// 从输入中获取一个
+int Number() :
+{
+    // 声明一个token
+    Token t;
+}
+{
+    // 使用number替换token
+    t = <NUMBER>
+    {
+        return Integer.parseInt(t.image);
+    }
+}
+
+TOKEN :
+{
+    < SELECT: "SELECT" >
+|   < NUMBER: (["0"-"9"])+ >
+|   < ADD: "+" >
+|   < SUB: "-" >
+}
+
+/*
+跳过的制表符
+* */
+SKIP :
+{
+    " "
+|   "\t"
+|   "\n"
+|   "\r"
+|   "\f"
+}
+
