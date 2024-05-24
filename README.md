@@ -9,7 +9,18 @@
 
 ### 如何使用模板引擎来扩展语法文件
 
-## sqlline
+### SqlCall#unparse(SqlWriter writer, int leftPrec, int rightPrec) 有什么用？
+
+> 如何通过模板引擎扩展实现以下SQL，SQL的功能是从一个source到处数据到另一个source。
+>
+> ```sql
+> LOAD hdfs:'/data/user.txt' TO mysql:'db.t_user' (name name, age age) SEPARATOR ','
+> ```
+>
+
+#### 为什么不把 `SqlLoadSource` 定义成一个 `SqlNode` 呢？
+
+## 第三章 - sqlline
 
 ### 使用calcite内置的csv作为第一个例子
 
@@ -66,6 +77,58 @@ cd calcite/example/csv
 ### 集成CSV文件开发实例
 
 >要在calcite中使用CSV，首先必须对CSV文件的格式进行定义
+
+#### schema
+
+> 1. `"name": "SALES"` 定义了schema的名字；
+> 2. `"type:"custom` 指定schema类型为用户自定义；
+> 3. `"factory"` 指定数据模型工厂；
+> 4. `operand.directory` 指定了文件的位置； 
+
+```json
+{
+  "version": "1.0",
+  "defaultSchema": "SALES",
+  "schemas": [
+    {
+      "name": "SALES",
+      "type": "custom",
+      "factory": "org.apache.calcite.adapter.csv.CsvSchemaFactory",
+      "operand": {
+        "directory": "sales"
+      }
+    }
+  ]
+}
+```
+
+#### 视图
+
+> 可以在schema中创建视图；
+
+```json
+{
+  "version": "1.0",
+  "defaultSchema": "SALES",
+  "schemas": [
+    {
+      "name": "SALES",
+      "type": "custom",
+      "factory": "org.apache.calcite.adapter.csv.CsvSchemaFactory",
+      "operand": {
+        "directory": "sales"
+      },
+      "tables": [
+        {
+          "name": "FEMALE_EMPS",
+          "type": "view",
+          "sql": "SELECT * FROM emps WHERE gender = 'F'"
+        }
+      ]
+    }
+  ]
+}
+```
 
 #### CsvSchemaFactory
 
@@ -165,9 +228,70 @@ public class CsvSchemaFactory implements SchemaFactory {
   }
 ```
 
-## 数据库查询优化技术
+## 第四章- 数据库查询优化技术
 
-### 逻辑查询优化
+```mermaid
+flowchart TD
+	queryInputLayer --> lexParserLayer --> checkLayer --> profile --> physicalLayer
+
+	subgraph queryInputLayer
+		查询输入层
+	end
+	subgraph lexParserLayer
+		语法解析层
+	end
+	subgraph checkLayer
+		subgraph metadata
+			元数据校验层
+			语义检查层
+		end
+		subgraph metadata-model
+			元数据模块
+		end
+	end
+	subgraph profile
+		查询优化层
+		数据统计模块
+	end
+	
+	subgraph physicalLayer
+		物理执行层
+	end
+```
+
+
+
+### 4.3 逻辑计划优化
+
+> `投影运算符(project)` --> `SELECT x,y FROM table_name;`
+
+```mermaid
+flowchart LR
+	关系模型
+	
+	关系模型 --> 关系数据结构
+	关系模型 --> 关系运算集合
+	关系模型 --> 关系完整性约束
+	
+	关系数据结构 --> 表 --> 行1[行1/行2/...] --> 字段[字段1/字段2/...]
+	
+	元数据管理:::important ---->|约束| 字段
+	
+	关系运算集合 --> 集合运算符
+	关系运算集合 --> 专门的关系运算符
+	关系运算集合 --> 比较运算符
+	关系运算集合 --> 逻辑运算符
+	
+	关系完整性约束 --> 实体完整性["实体完整性（主键/NOT NULL）"]
+	关系完整性约束 --> 参照完整性["参照完整性（外键）"]
+	关系完整性约束 --> 域完整性["域完整性（枚举）"]
+
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
+
+
+
+#### 4.3.2 关系代数优化规则
 
 >优化就是基于关系代数的等价转换。
 >
@@ -233,6 +357,15 @@ ON
 
 ### 4.4 物理计划优化
 
+> 相对于传统数据库的架构：
+>
+> ```mermaid
+> flowchart LR
+> 	CPU <--> 一级缓存  <--> 二级缓存 <--> 三级缓存 <--> 内存 <--> 硬盘
+> ```
+>
+> 
+
 相比与逻辑计划优化，物理计划更贴近于计算机的物理层面。距离来说，当我们做逻辑优化的时候，我们不需要考虑计算运行于intel还是amd的CPU，也不需要考虑硬盘使用的是SSD还是普通的机械硬盘诸如此类的问题。
 
 
@@ -243,29 +376,56 @@ ON
 
 传统的单机数据我们主要考虑的是I/O和CPU的开销：
 
+> - `page_num` 查询的页数
+> - `cpu_time_per_page` 每页消耗的CPU时间
+> - `cpu_cost` 计算代价，包括数据的处理、过滤等
+
 ```
 cost() = page_num * cpu_time_per_page + cpu_cost
 ```
 
-而很多新的分布式数据库，我们还需要考虑服务器之间通信的开销。
+> 很多新的分布式数据库，我们还需要考虑服务器之间通信的开销。
+>
+> ```mermaid
+> flowchart LR
+> 
+>  machine1 <-->|网络通信| machine2 <-->|网络通信| machine3
+> 
+> 	subgraph machine1
+> 		direction LR
+> 		CPU1[cpu]
+> 		memory1[memory]
+> 		disk1[disk]
+> 	end
+> 	subgraph machine2
+> 		direction LR
+> 		CPU2[cpu]
+> 		memory2[memory]
+> 		disk2[disk]
+> 	end
+> 	subgraph machine3
+> 		direction LR
+> 		CPU3[cpu]
+> 		memory3[memory]
+> 		disk3[disk]
+> 	end
+> 	
+> ```
+>
+> 
 
 
 
-在更具体的优化中，我们还拆分了 **侧重于数据的逻辑代价**，**侧重于服务器环境的物理执行代价**，**针对算法原子操作的算法代价**。
+> 在更具体的优化中，我们还拆分了
 
+```mermaid
+flowchart LR
 
-
-逻辑代价主要瞄准于数据，一般和统计模块总和使用。主要基于操作的结果集大小等参数来优化；
-
-
-
-物理执行代价更加侧重于计算机物理层面的代价，简而言之我们要尽量从速度更快的地方读取数据（例如CPU的缓存优先级高于内存），通过SIMD等方式更加并行的利用CPU，在保证进程不崩溃的情况下提高缓存命中率；在访问硬盘时顺序读写优先于随机读写。
-
-
-
-算法代价主要是针对于算法的。
-
-
+	物理机计划优化 --> 侧重于数据的逻辑代价 --> 统计不同数据下的逻辑用于优化同一个查询针对不同数据的执行计划
+	物理机计划优化 --> 侧重于服务器环境的物理执行代价 --> CPU缓存 --> 内存 --> 硬盘
+	侧重于服务器环境的物理执行代价 --> SIMD
+	物理机计划优化 --> 针对算法原子操作的算法代价
+```
 
 ### 优化模型
 
@@ -295,7 +455,7 @@ WHERE
 ```mermaid
 flowchart TD
 	user[用户]
-	project[project\nid,name,age]
+	project["project（投影）\nid,name,age"]
 	filter[过滤\nage > 30]
 	data[数据源\npeople]
 
@@ -318,11 +478,70 @@ filter --> data
 
 ### 5.1 Avatica架构介绍
 
-Avatica 分为客户端和服务端；
+```mermaid
+flowchart LR
+	Avatica客户端 --> AvaticaRPC服务端
+	Avatica驱动SPI --> Calcite
+	subgraph Avatica服务端
+		direction BT
+		AvaticaRPC服务端 --> Avatica驱动SPI
+		Avatica驱动SPI:::important
+		AvaticaRPC服务端[Avatica RPC服务端]
+	end
+	
+	subgraph Calcite
+		direction LR
+		calcite-core
+		CalciteJDBC[Caclite JDBC 驱动]
+	end
+	
+	subgraph Avatica客户端
+		direction LR
+		Java客户端
+		Python客户端
+		C客户端
+		其他客户端[...]
+	end
 
-客户端提供了多种语言的实现，用于向服务端发送RPC请求；
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
 
-服务端只提供了java的客户端，接收客户端发送的请求，然后将请求转发到 calcite-core。
+>为了扩展，Avatica服务端使用了 `SPI(Service Provider Interface)`，服务提供方在 `META-INF/services` 下声明一些类的全路径，这些类实现了服务定义方的服务接口。在代码运行时，服务定义方能够在这个目录下找到自己服务接口的实现类，然后加载并运行。
+
+```mermaid
+flowchart LR
+	SPI --> 服务定义方 --> Avatica
+	SPI --> 服务提供方 --> 其他数据库
+```
+
+
+
+### 5.2 Avatica执行结构和流程
+
+> - `Server` API for request-response calls to an Avatica server.
+> - `Meta` Command handler for getting various metadata. Should be implemented by each driver.
+
+```mermaid
+flowchart LR
+	AvaticaServer --> Service["org.apache.calcite.avatica.remote.Service"]
+	AvaticaServer --> Meta["org.apache.calcite.avatica.Meta"]
+	
+	Service --> 元数据接口
+	Service --> 执行查询请求和获取结果请求
+	Service --> 事务请求
+	Service --> otherService[...]
+	
+	Meta --> openConnection
+	Meta --> createStatement
+	Meta --> execute
+	Meta --> fetch
+	Meta --> closeConnection
+	Meta --> otherMeta[...]
+```
+
+#### 5.2.1 Service接口
+
+
 
 ##  第六章 - 解析层
 

@@ -1,6 +1,5 @@
 package com.xxx;
 
-import com.google.protobuf.WireFormat;
 import lombok.Getter;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlNode;

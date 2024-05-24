@@ -26,3 +26,5 @@ hs_err_pid*
 06-calcite-parser-example/generated-sources/*
 
 *.iml
+
+target/
