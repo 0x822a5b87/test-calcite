@@ -2,6 +2,7 @@ package com.xxx.ch05;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
@@ -18,7 +19,14 @@ public class AvaticaClient {
                                                  + "authentication=DIGEST", properties)) {
 
             Statement statement = connection.createStatement();
-            statement.execute("SHOW databases;");
+            ResultSet rs = statement.executeQuery("select * from db limit 1;");
+            if (rs.next()) {
+                // 这里有个问题需要注意
+                // 如果mysql的字段类型为 char(255)，这里会读取255长度的字符串
+                System.out.printf("[%s]\n", rs.getString("Host"));
+                System.out.printf("[%s]\n", rs.getString("Db"));
+                System.out.printf("[%s]\n", rs.getString("User"));
+            }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
