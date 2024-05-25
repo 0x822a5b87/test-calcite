@@ -541,9 +541,61 @@ flowchart LR
 
 #### 5.2.1 Service接口
 
-
-
 ##  第六章 - 解析层
+
+```mermaid
+flowchart TD
+	queryInputLayer --> lexParserLayer --> checkLayer --> profile --> physicalLayer
+
+	subgraph queryInputLayer
+		查询输入层
+	end
+	subgraph lexParserLayer
+		语法解析层:::important
+	end
+	subgraph checkLayer
+		subgraph metadata
+			元数据校验层
+			语义检查层
+		end
+		subgraph metadata-model
+			元数据模块
+		end
+	end
+	subgraph profile
+		查询优化层
+		数据统计模块
+	end
+	
+	subgraph physicalLayer
+		物理执行层
+	end
+
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
+
+### 6.1 语法解析过程
+
+```mermaid
+flowchart TB
+异常监听器 --> 字符串处理器
+异常监听器 --> 词法分析器
+异常监听器 --> 语法分析器
+
+subgraph 语法解析
+	direction TB
+	string["输入"] -->|string| 字符串处理器 -->|字符流| 词法分析器 -->|tokens| 语法分析器 --> AST
+end
+
+
+表格管理器 --> 字符串处理器
+表格管理器 --> 词法分析器
+表格管理器 --> 语法分析器
+```
+
+
+
+### 6.2 Calcite解析体系
 
 #### 6.2.2 SqlNode 体系
 
@@ -551,9 +603,199 @@ flowchart LR
 
 其中`SqlLiteral`,`SqlCall`, `SqlIdentifier`都是 SqlNode 的子类。
 
+```mermaid
+---
+title: SqlNode体系
+---
+classDiagram
+	class Cloneable {
+		<<interface>>
+	}
+	class SqlNode {
+		+SqlKind getKind()
+		+boolean isA(Set<SqlKind>)
+	}
+	
+	class SqlLiteral {
+		SqlTypeName typeName
+		Object value
+	}
+	Cloneable <|-- SqlNode
+	
+	SqlNode <|-- SqlLiteral
+	SqlNode <|-- SqlIdentifier
+	SqlNode <|-- SqlCall
+```
+
+
+
 > - `SqlLiteral` SQL 中的字面量；
 > - `SqlCall` 是对 `SqlOperator` 的一次调用；`Operator` 可用于描述任何语法结构，因此实际上，SQL 解析树中的每个非叶节点都是某种 SqlCall；
 > - `SqlIdentifier` SQL 中的 identifier，例如 select 语句中的字段，where 语句后的跟的表。
 
-### 6.3 JavaCC
+```mermaid
+---
+title: SqlCall
+---
+classDiagram
+	Cloneable <|-- SqlNode
+	SqlNode <|-- SqlCall
+	SqlCall <|-- SqlAlter
+	SqlCall <|-- SqlExplain
+	SqlCall <|-- SqlDdl
+	SqlCall <|-- SqlInsert
+	SqlCall <|-- SqlDelete
+	SqlCall <|-- SqlBasicCall
+	SqlCall <|-- SqlSelect
+```
 
+
+
+##### SqlSelect
+
+一个标准的SQL语句类似于如下结构
+
+```mermaid
+---
+select语句结构
+---
+flowchart TB
+	selectStatement --> fromStatement
+	subgraph selectStatement
+		direction LR
+		SELECT --> selectList:::important
+	end
+	
+	subgraph fromStatement
+		FROM --> from["from"]:::important
+		from --> WHERE --> where["where"]:::important
+	end
+
+	fromStatement -..-> groupStatement
+	subgraph groupStatement
+		GROUPBY["GROUP BY"] --> group:::important
+		group --> HAVING
+		HAVING --> having:::important
+	end
+	groupStatement --> orderByStatement
+	subgraph orderByStatement
+		ORDERBY["ORDER BY"] --> orderBy:::important --> offset:::important --> dot[","] --> fetch:::important
+	end
+	
+
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
+
+所以，在 SqlSelect 的代码中，我们包含了如下属性，最终会生成一颗语法树，而这些 `selectList`， `from` 等都会成为 **SqlSelect的子节点。**
+
+```java
+public class SqlSelect extends SqlCall {
+
+  // constants representing operand positions
+  public static final int FROM_OPERAND = 2;
+  public static final int WHERE_OPERAND = 3;
+  public static final int HAVING_OPERAND = 5;
+
+  SqlNodeList keywordList;
+  SqlNodeList selectList;
+  SqlNode from;
+  SqlNode where;
+  SqlNodeList groupBy;
+  SqlNode having;
+  SqlNodeList windowDecls;
+  SqlNodeList orderBy;
+  SqlNode offset;
+  SqlNode fetch;
+  SqlNodeList hints;
+}
+```
+
+##### SqlInsert
+
+同理，一个 `SqlInsert` 也是类似的结构
+
+```mermaid
+flowchart LR
+	INSERT["INSERT INTO"] --> targetTable:::important -..->|from other source| source:::important
+	targetTable -..->|from values| columnList:::important
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
+
+
+
+对应的属性如下：
+
+```java
+public class SqlInsert extends SqlCall {
+  SqlNodeList keywords;
+  SqlNode targetTable;
+  SqlNode source;
+  SqlNodeList columnList;
+}
+```
+
+我们可以观察到，这里可能是 `source` 或者 `columnList`，这是因为我们的 INSERT 语法有两种模式：
+
+```sql
+# from another source
+INSERT INTO targetTable(...) SELECT (...) FROM ...;
+
+# from values
+INSERT INTO targetTable(...) VALUES (...)
+```
+
+##### SqlNode工作方式示例SQL语句
+
+```sql
+SELECT
+	id
+FROM t
+WHERE id > 1;
+```
+
+根据我们前面的知识，我们可以推断出来这个SQL会形成一个如下AST，注意SqlNodeList、SqlBasicCall、SqlOperator的定义
+
+```java
+// SqlNodeList 是一个 SqlNode 的集合
+public class SqlNodeList extends SqlNode implements Iterable<SqlNode> {
+
+}
+```
+
+```java
+// SqlBasicCall 是 SqlNode 的子类，并且持有一个 SqlOperator
+public class SqlBasicCall extends SqlCall {
+  private SqlOperator operator;
+  public final SqlNode[] operands;
+  private final SqlLiteral functionQuantifier;
+  private final boolean expanded;
+}
+
+public abstract class SqlCall extends SqlNode {
+}
+```
+
+
+
+```mermaid
+flowchart TB
+	SqlSelect --> selectList:::important
+	SqlSelect --> from:::important
+	SqlSelect --> where:::important
+	
+	selectList --> SqlNodeList
+	SqlNodeList --> SqlIdentifier --> selectNodeIdentifier["id"]:::important
+	
+	from --> FromSqlNode["SqlNode"] --> FromSqlIdentifier["SqlIdentifier"] --> FromStatement["t"]:::important
+	
+	where --> SqlBasicCall["SqlBasicCall"]
+	SqlBasicCall -..->|内部持有| SqlBinaryOperator --> GreaterThan
+	GreaterThan --> LeftSqlIdentifier --> Left["id"]:::important
+	GreaterThan --> RightSqlIdentifier --> Right["1"]:::important
+	
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
+
+
+
+### 6.3 JavaCC
