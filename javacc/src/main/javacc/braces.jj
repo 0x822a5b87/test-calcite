@@ -1,5 +1,4 @@
 options {
-  PACKAGE = "com.xxx";
 }
 
 PARSER_BEGIN(Example)
