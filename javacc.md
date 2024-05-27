@@ -1229,11 +1229,507 @@ SpecialToken 在 `Token.java` 中有个单独的变量：
 public Token specialToken;
 ```
 
+### Lookahead
+
+#### What is lookahead
+
+##### Example1
+
+```java
+void Input() :
+{}
+{
+  "a" BC() "c"
+}
+
+void BC() :
+{}
+{
+  "b" [ "c" ]
+}
+```
+
+给定以上 javacc 语法，明显以下两个字符匹配语法，但是假设输入是 `abc`，我们思考一下匹配流程：
+
+1. 匹配字符 "a"；
+2. 进入 BC()，匹配字符 "b"；
+3. 在BC()中，匹配字符"c"；
+4. 回到Input()，匹配"c"失败；
+5. 回退到BC()，不匹配字符 "c"；
+6. 回到Input()，匹配字符 "c"；
+
+可以看到，我们在 BC() 中匹配 `[ "c" ]` 这一步中，我们面临多个选择，也就是我们所说的 `choice points`。
+
+```
+abc
+abcc
+```
+
+我们可以画图表示我们的整个流程：
+
+```mermaid
+flowchart LR
+	subgraph Input["Input()"]
+		direction LR
+		A0[&quota&quot] --> BC --> C0[&quotc&quot]
+	end
+	
+	subgraph BC["BC()"]
+		direction LR
+		B1[&quotb&quot] --> C1[ &#91 &quotc&quot &#93 ]:::optional
+	end
+	
+	
+	subgraph 匹配
+			value["&quotabc&quot"] -..->|输入 &quota&quot| A0 -..-> valueBC
+			valueBC["&quotbc&quot"] -..->|输入 &quotb&quot| B1 -..-> valueC["&quotc&quot"]
+			valueC -..->|输入&quotc&quot| C1 -..-> valueEmpty["&quot&quot"]
+			valueEmpty -..->|输入&quot&quot| C0:::notMatch  -->|backtrace| valueC2["&quotc&quot"]
+			valueC2 -->|输入&quotc&quot| C1:::match
+	end
+
+
+classDef optional fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+classDef match fill:#f9f,stroke:#333,stroke-width:4px
+```
 
 
 
+##### Avoiding backtracking
+
+编译器在 `choice points` 会通过一些特殊的方式去判断具体的选择，javacc 是通过 **some exploration of tokens further ahead in the input stream** 来决定。这种通过查看输入流后面的tokens的方式，我们称之为 LOOKAHEAD。
+
+##### Choice points in JavaCC grammars
+
+有四种可能得 choice points：
+
+| expansion               | description |
+| ----------------------- | ----------- |
+| (expr1 \| epxr2 \| ...) |             |
+| (expr)？                |             |
+| (expr)*                 |             |
+| (expr)+                 |             |
+
+##### Default choice determination algorithm
+
+默认 LOOKAHEAD(1)。
+
+##### Example2
+
+> 对于一下 `bnf_production`，我们匹配三个不同的模块：
+>
+> 1. <ID> "(" expr() ")"
+>    1. 匹配<ID> identifier
+>    2. 匹配 (
+>    3. 匹配 expr()
+>    4. 匹配 )
+> 2. "(" expr() ")"
+>    1. 匹配 (
+>    2. 匹配 epxr()
+>    3. 匹配 )
+> 3. "new" <ID> identifier
+>    1. 匹配 new
+>    2. 匹配 <ID> identifier
+
+```java
+void basic_expr() :
+{}
+{
+  <ID> "(" expr() ")"	// Choice 1
+|
+  "(" expr() ")"	// Choice 2
+|
+  "new" <ID>		// Choice 3
+}
+```
+
+对应的伪代码是
+
+```java
+if (next token is <ID>) {
+  // choose Choice 1
+} else if (next token is "(") {
+  // choose Choice 2
+} else if (next token is "new") {
+  // choose Choice 3
+} else {
+  // produce an error message
+}
+```
+
+上面的代码存在一个问题：选择决定算法是由上到下工作，如果第一个选项满足，后面的条件甚至都不会进入匹配流程。在语法多处可匹配需要使用LOOKAHEAD的位置这会导致匹配异常。
+
+##### Example3
+
+在下面的例子中，如果我们使用上面的这种 top-bottom，并且只读取一个 token 的方式，在第一个token为 <ID> 的情况下，将永远无法进入 choice 4 的匹配流程。因为 `next token is <ID>` 永远为 true。
+
+```java
+void basic_expr() :
+{}
+{
+  <ID> "(" expr() ")"	// Choice 1
+|
+  "(" expr() ")"	// Choice 2
+|
+  "new" <ID>		// Choice 3
+|
+  <ID> "." <ID>		// Choice 4
+}
+```
+
+##### Example4
+
+```java
+void identifier_list() :
+{}
+{
+  <ID> ( "," <ID> )*
+}
+```
+
+如果没有LOOKAHEAD，那么我们匹配的伪代码如下所示：
+
+```java
+while (next token is ",") {
+  choose the nested expansion (i.e. go into the (...)* construct)
+	consume the "," token
+	if (next token is <ID>) {
+    consume it, otherwise report error
+  }
+}
+```
+
+在这个代码中，我们没有去看 `(...)*` 后面的token来决定。
+
+##### Example5
+
+```java
+void funny_list() :
+{}
+{
+  identifier_list() "," <INT>
+}
+
+void identifier_list() :
+{}
+{
+  <ID> ( "," <ID> )*
+}
+```
+
+如果是 Example4 中的模式，那么我们这里会导致一些合法的输入也报错。
+
+#### LOOKAHEAD Specification
+
+> 第一种方式是修改我们的语法。
+
+##### Example6
+
+我们可以通过修改语法实现来避免 `example3` 中出现的问题。例如，在下面的代码中，我们把：
+
+- <ID> "(" expr() ")"
+- <ID> "." <ID>
+
+进行了一次合并，这个合并类似于数学方程式里的合并同类型，结果是 `<ID> ("(" expr() ")" | "." <ID>)`，注意，这里的 最外层的 `()` 一定不能省略，这样它们才会被识别为一整个 `expansion`，而 <ID> 和 ( "(" expr() ")" | "." <ID> ) 是这个 expansion 中的 expansion_unit，并且存在如下关系
+
+```mermaid
+flowchart LR
+	ID[< ID >]:::value --> expansion_unit0[expansion_unit] --> regular_expression0[regular_expression] --> java_identifier["&quot&quot<&quotjava_identifier&quot>&quot&quot"]
+	
+	expansion_value["( &quot(&quot expr() | &quot.&quot < ID > &quot)&quot) "]:::value --> expansion_unit1[expansion_unit] --> expansion_choices
+	
+classDef grammer fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+classDef value fill:#f9f,stroke:#333,stroke-width:4px
+```
 
 
 
+```java
+void basic_expr() :
+{}
+{
+  <ID> ( "(" expr() ")" | "." <ID> )
+|
+  "(" expr() ")"
+|
+  "new" <ID>
+}
+```
 
+**This process of modifying grammars to make them `LL(1)` is called *left factoring*.**
+
+##### Example7
+
+```java
+void funny_list() :
+{}
+{
+  <ID> "," ( <ID> "," )* <INT>
+}
+```
+
+##### Option 2 - Parser hints
+
+在下面的例子中，我们的left-factoring不生效。
+
+```java
+void basic_expr() :
+{}
+{
+  { initMethodTables(); } <ID> "(" expr() ")"
+|
+  "(" expr() ")"
+|
+  "new" <ID>
+|
+  { initObjectTables(); } <ID> "." <ID>
+}
+```
+
+##### Setting a global LOOKAHEAD specification
+
+**Suppose you set the value of this option to `2`. Then the `LOOKAHEAD` algorithm derived from this looks at two tokens** (instead of just one token) before making a choice decision. Hence, in [Example 3](https://javacc.github.io/javacc/tutorials/lookahead.html#example3), `Choice 1` will be taken only if the next two tokens are `<ID>` and `(`, while `Choice 4` will be taken only if the next two tokens are `<ID>` and `.`. Hence, the parser will now work properly for [Example 3](https://javacc.github.io/javacc/tutorials/lookahead.html#example3). Similarly, the problem with [Example 5](https://javacc.github.io/javacc/tutorials/lookahead.html#example5) also goes away since the parser goes into the `(...)*` construct only when the next two tokens are `,` and `<ID>`.
+
+##### Setting a local LOOKAHEAD specification
+
+```java
+void basic_expr() :
+{}
+{
+  // setting a local LOOKAHEAD specification
+  LOOKAHEAD(2)
+  <ID> "(" expr() ")"	// Choice 1
+|
+  "(" expr() ")"	// Choice 2
+|
+  "new" <ID>		// Choice 3
+|
+  <ID> "." <ID>		// Choice 4
+}
+```
+
+伪代码如下：
+
+```java
+if (next 2 tokens are <ID> and "(" ) {
+  // choose Choice 1
+} else if (next token is "(") {
+  // choose Choice 2
+} else if (next token is "new") {
+  // choose Choice 3
+} else if (next token is <ID>) {
+  // choose Choice 4
+} else {
+  // produce an error message
+}
+```
+
+##### Exampe9
+
+> 相似的，exampe5可以修改如下：
+>
+> *N.B. The `LOOKAHEAD` specification has to occur inside the `(...)` which is the choice is being made. The translation for this construct is shown below (after the first `<ID>` has been consumed):*
+
+```java
+void identifier_list() :
+{}
+{
+  <ID> ( LOOKAHEAD(2) "," <ID> )*
+}
+
+// example5
+void funny_list() :
+{}
+{
+  identifier_list() "," <INT>
+}
+
+// example4
+void identifier_list() :
+{}
+{
+  <ID> ( "," <ID> )*
+}
+```
+
+```java
+while (next 2 tokens are "," and <ID>) {
+  choose the nested expansion (i.e., go into the (...)* construct)
+  consume the "," token
+  consume the <ID> token
+}
+```
+
+##### Examp10
+
+javacc无法验证本地lookahead的正确性，如以下if语句示例所示
+
+```java
+void IfStm() :
+{}
+{
+ "if" C() S() [ "else" S() ]
+}
+
+void S() :
+{}
+{
+  ...
+|
+  // S() 中可以嵌套if语句
+  IfStm()
+}
+```
+
+上面这个错误是著名的 `dangling else problem`，假设我们有如下输入
+
+```java
+if c1 if c2 s1 else s2
+```
+
+`else s2` 可以被绑定到这两个 `if` 语句中的任意一个！标准的解决方法是，绑定到 `if c2` 上，也就是离 else 最近的那个 if statement。
+
+##### Syntactic LOOKAHEAD
+
+存在如下语法
+
+```java
+void TypeDeclaration() :
+{}
+{
+  ClassDeclaration()
+|
+  InterfaceDeclaration()
+}
+```
+
+在 `syntactic  level`，ClassDeclaration 前面可以有很多的前缀，例如 `abstract`， `public` 等。假设这个前缀超过了极限，此时我们可以通过 `syntatctic lookahead` 解决：
+
+> **In syntactic `LOOKAHEAD`, you specify an expansion to try it out and, if that succeeds, then the following choice is taken.**
+
+```java
+void TypeDeclaration() :
+{}
+{
+  LOOKAHEAD(ClassDeclaration())
+  ClassDeclaration()
+|
+  InterfaceDeclaration()
+}
+```
+
+等同于伪代码：
+
+```java
+if (the tokens from the input stream match ClassDeclaration) {
+  // choose ClassDeclaration()
+} else if (next token matches InterfaceDeclaration) {
+  // choose InterfaceDeclaration()
+} else {
+  // produce an error message
+}
+```
+
+但是他同样存在一个问题：它会消耗较多的时间和做了许多不必要的检查。在我们的实际应用中，我们的输入在碰到 `class` 时就已经结束，因为 `class abstract` 这种语法是不合法的，所以我们在 lookahead 可以继续优化；
+
+```java
+void TypeDeclaration() :
+{}
+{
+  LOOKAHEAD(("public" | "final" | "abstract")* "class")
+  ClassDeclaration()
+|
+  InterfaceDeclaration()
+}
+```
+
+等同于一下伪代码，这样在代码碰见 class 的时候就会结束。
+
+```java
+if (the next set of tokens from the input stream are a sequence of
+  "abstract", "final", and "public" followed by a "class") {
+  // choose ClassDeclaration()
+} else if (next token matches InterfaceDeclaration) {
+  // choose InterfaceDeclaration()
+} else {
+  // produce an error message
+}
+```
+
+##### Semantic LOOKAHEAD
+
+再回到 Example1：
+
+```java
+void Input() :
+{}
+{
+  "a" BC() "c"
+}
+
+void BC() :
+{}
+{
+  "b" [ "c" ]
+}
+```
+
+这个例子有个问题是，在BC()中，每次当我们在 choice points 接收到输入 "c" 时，都会匹配并导致后续的 "c" 无法正常匹配，我们可以通过 Semantic Lookahead 来避免：
+
+```java
+void Input() :
+{}
+{
+  "a" BC() "c"
+}
+
+void BC() :
+{}
+{
+  "b"
+  // 这里，我们绑定了 "c" 到一个新建的 TOKEN C。
+  [ LOOKAHEAD( { getToken(1).kind == C && getToken(2).kind != C } )
+    <C:"c">
+  ]
+}
+```
+
+等同于伪代码：
+
+```java
+if (next token is "c" and following token is not "c") {
+  // choose the nested expansion (i.e., go into the [...] construct)
+} else {
+  // go beyond the [...] construct without entering it.
+}
+```
+
+另外，LOOKAHEAD 也可以接收 `expansion` 作为参数：
+
+```java
+void BC() :
+{}
+{
+  "b"
+  [ LOOKAHEAD( "c", { getToken(2).kind != C } )
+    <C:"c">
+  ]
+}
+```
+
+##### General structure of LOOKAHEAD
+
+The general structure of a `LOOKAHEAD` specification is:
+
+```java
+// general structure of LOOKAHEAD
+LOOKAHEAD ( amount, expansion, { boolean_expression } )
+
+// grammer
+local_lookahead ::= "LOOKAHEAD" "(" [ java_integer_literal ] [ "," ] [ expansion_choices ] [ "," ] [ "{"    java_expression "}" ] ")"
+```
+
+The `amount` specifies the number of tokens to `LOOKAHEAD`, `expansion` specifies the expansion to use to perform syntactic `LOOKAHEAD`, and `boolean_expression` is the expression to use for semantic `LOOKAHEAD`.
+
+At least one of the three entries must be present. If more than one are present, they are separated by commas.
 
