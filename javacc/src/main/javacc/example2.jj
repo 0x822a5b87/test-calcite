@@ -1,0 +1,29 @@
+//
+PARSER_BEGIN(Example2)
+
+public class Example2 {
+    public static void main(String[] args) throws ParseException {
+        Example2 parser = new Example2(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example2)
+
+void Input() : {}
+{
+    MatchedBraces() <EOF>
+}
+
+void MatchedBraces() : {}
+{
+    // 这里的代码不会报错
+    "{" [ MatchedBraces() ] "}"
+}
+
+// 这里的代码 "\r" 和 "\n" 会提示
+// Duplicate definition of string token "\r" (implicitly defined at line 13)
+SKIP : {
+    " "
+    | "\r"
+    | "\n"
+}

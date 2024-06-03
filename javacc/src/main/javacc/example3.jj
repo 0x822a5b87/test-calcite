@@ -1,0 +1,48 @@
+//
+PARSER_BEGIN(Example3)
+
+public class Example3 {
+    public static void main(String[] args) throws ParseException {
+        Example3 parser = new Example3(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example3)
+
+void Input() :
+{
+    int count;
+}
+{
+    count = MatchedBraces() <EOF>
+    {
+        System.out.println("The levels of nesting is : " + count);
+    }
+}
+
+
+int MatchedBraces() :
+{
+    int nested = 0;
+}
+{
+    // nested = MatchedBraces()
+    // 表示 expansion_unit 中的 [ java_assignment_lhs "=" ] regular_expression 部分
+    <LBRACE> [ nested = MatchedBraces() ] <RBRACE>
+
+    // java_block
+    {
+        return ++nested;
+    }
+}
+
+SKIP : {
+    " "
+    | "\r"
+    | "\n"
+}
+
+TOKEN : {
+    <LBRACE: "{">
+    | <RBRACE : "}">
+}

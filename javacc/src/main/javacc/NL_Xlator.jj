@@ -1,0 +1,141 @@
+PARSER_BEGIN(NL_Xlator)
+
+/**
+ * New line translator.
+ */
+public class NL_Xlator {
+
+  /** Main entry point. */
+  public static void main(String args[]) throws ParseException {
+    NL_Xlator parser = new NL_Xlator(System.in);
+    parser.ExpressionList();
+  }
+
+}
+
+PARSER_END(NL_Xlator)
+
+SKIP :
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+}
+
+TOKEN :
+{
+  < ID: ["a"-"z","A"-"Z","_"] ( ["a"-"z","A"-"Z","_","0"-"9"] )* >
+|
+  < NUM: ( ["0"-"9"] )+ >
+}
+
+/** Top level production. */
+void ExpressionList() :
+{
+	String s;
+}
+{
+	{
+	  System.out.println("Please type in an expression followed by a \";\" or ^D to quit:");
+	  System.out.println();
+	}
+  ( s=Expression() ";"
+	{
+	  System.out.println(s);
+	  System.out.println();
+	  System.out.println("Please type in another expression followed by a \";\" or ^D to quit:");
+	  System.out.println();
+	}
+  )*
+  <EOF>
+}
+
+/** An Expression. */
+String Expression() :
+{
+	java.util.Vector<String> termImage = new java.util.Vector<>();
+	String s;
+}
+{
+  s=Term()
+	{
+	  termImage.addElement(s);
+	}
+  ( "+" s=Term()
+	{
+	  termImage.addElement(s);
+	}
+  )*
+	{
+	  if (termImage.size() == 1) {
+	    return (String)termImage.elementAt(0);
+      } else {
+        s = "the sum of " + termImage.elementAt(0);
+	    for (int i = 1; i < termImage.size()-1; i++) {
+	      s += ", " + termImage.elementAt(i);
+	    }
+	    if (termImage.size() > 2) {
+	      s += ",";
+	    }
+	    s += " and " + termImage.elementAt(termImage.size()-1);
+            return s;
+      }
+	}
+}
+
+/** A Term. */
+String Term() :
+{
+	java.util.Vector<String> factorImage = new java.util.Vector<String>();
+	String s;
+}
+{
+  s=Factor()
+	{
+	  factorImage.addElement(s);
+	}
+  ( "*" s=Factor()
+	{
+	  factorImage.addElement(s);
+	}
+  )*
+	{
+	  if (factorImage.size() == 1) {
+	    return (String)factorImage.elementAt(0);
+          } else {
+            s = "the product of " + (String)factorImage.elementAt(0);
+	    for (int i = 1; i < factorImage.size()-1; i++) {
+	      s += ", " + (String)factorImage.elementAt(i);
+	    }
+	    if (factorImage.size() > 2) {
+	      s += ",";
+	    }
+	    s += " and " + (String)factorImage.elementAt(factorImage.size()-1);
+            return s;
+          }
+	}
+}
+
+/** A Factor. */
+String Factor() :
+{
+	Token t;
+	String s;
+}
+{
+  t=<ID>
+    {
+        return t.image;
+    }
+|
+  t=<NUM>
+	{
+	  return t.image;
+	}
+|
+  "(" s=Expression() ")"
+	{
+	  return s;
+	}
+}

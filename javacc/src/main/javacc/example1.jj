@@ -1,0 +1,30 @@
+//
+PARSER_BEGIN(Example1)
+
+public class Example1 {
+    public static void main(String[] args) throws ParseException {
+        Example1 parser = new Example1(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example1)
+
+void Input() :
+{}
+{
+    MatchedBraces() ("\r" | "\n")* <EOF>
+}
+
+
+// 根据 bnf_production 的定义
+// void MatchedBraces() 中的 MatchedBraces 对应的类型是 java_identifier
+// 而 { "{" [ MatchedBraces() ] "}" } 内部，是一个 expansion_unit*
+// 而在 expansion_unit 的定义中，可以是
+// string_literal 对应 "{" 和 "}"
+// [ java_assignment_lhs "=" ] java_identifier "(" java_expression_list ")"
+// 对应 MatchedBraces()
+void MatchedBraces() :
+{}
+{
+    "{" [ MatchedBraces() ] "}"
+}

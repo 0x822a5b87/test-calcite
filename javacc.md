@@ -1733,3 +1733,389 @@ The `amount` specifies the number of tokens to `LOOKAHEAD`, `expansion` specifie
 
 At least one of the three entries must be present. If more than one are present, they are separated by commas.
 
+## Error Handling
+
+1. exception 有两种类型： `TokenMgrError` 和 `ParseException`。
+1. `TokenMgrError` is a subclass of `Error` while `ParseException` is a subclass of `Exception`.
+
+```java
+// 这两个类，在javacc生成的代码中会一并生成
+public class ParseException extends Exception {
+
+}
+
+public class TokenMgrError extends Error {
+  
+}
+```
+
+### Shallow error recovery
+
+```java
+void Stm() :
+{}
+{
+  IfStm()
+|
+  WhileStm()
+}
+```
+
+如果我们希望匹配失败时跳转到下下一个 semicolon，可以这样
+
+```java
+void Stm() :
+{}
+{
+  IfStm()
+|
+  WhileStm()
+|
+  error_skipto(SEMICOLON)
+}
+```
+
+```java
+JAVACODE
+void error_skipto(int kind) {
+  ParseException e = generateParseException();  // generate the exception object
+  System.out.println(e.toString());  // print the error message
+  Token t;
+  // consume tokens all the way up to a token of "kind" - use a do-while loop
+  // rather than a while because the current token is the one immediately before
+  // the erroneous token (in our case the token immediately before what should
+  // have been "if"/"while".
+  do {
+    t = getNextToken();
+  }
+  while (t.kind != kind);
+}
+```
+
+### Deep Error Recovery
+
+还是同样的例子：
+
+```java
+void Stm() :
+{}
+{
+  IfStm()
+|
+  WhileStm()
+}
+```
+
+假设我们的异常是在内层抛出的，例如我们解析进入了 `WhilStm()`，并且在内层解析异常。此时由于我们已经进入了新的 javacc 语句块，我们的 `shallow error recovery` 是没有办法处理这个异常的。例如假设我们期望的语法是：
+
+```java
+while (foo) {
+  stm;
+}
+```
+
+我们实际的输入是
+
+```java
+while foo {
+  stm;
+}
+```
+
+此时，我们可以通过 `try catch finally` 来捕捉这个异常
+
+```java
+void Stm() :
+{}
+{
+  try {
+      IfStm()
+    |
+      WhileStm()
+    |
+  } catch (ParseException e) {
+    error_skipto(SEMICOLON);
+  }
+}
+```
+
+再对比一下 error_skipto 函数，我们其实可以省略掉 `generateParseException()` 的调用，因为 catch 语句块已经为我们提供了异常：
+
+```java
+void Stm() :
+{}
+{
+  try {
+    (
+      IfStm()
+    |
+      WhileStm()
+    )
+  }
+  catch (ParseException e) {
+    System.out.println(e.toString());
+    Token t;
+    do {
+      t = getNextToken();
+    } while (t.kind != SEMICOLON);
+  }
+}
+```
+
+## Lexer Tips
+
+> This section presents a few tips for writing good lexical specifications.
+
+### String Literals
+
+#### Using string literals as much as possible
+
+**字符常量由 Deterministic Finite Automata（确定有限状态自动机） 识别，速度比 Non-deterministic Finite Automata（不确定有限状态自动机）快很多。**以下面的例子为例
+
+```java
+// DFA
+SKIP : { " " | "\t" | "\n"}
+
+// NFA
+SKIP : { < ([" ", "\t", "\n"])+ > }
+```
+
+### Lexical States
+
+#### Minimize use of lexical states
+
+> Try to minimize the use of lexical states.
+>
+> When using them, try to move all your complex regular expressions into a single lexical state, leaving others to just recognize simple string literals.
+
+### Other
+
+#### Avoid using IGNORE_CASE selectively
+
+Best practise is to set the `IGNORE_CASE` option at the grammar level. If that is not possible, then try to have it set for *all* regular expressions in a lexical state.
+
+
+
+## JavaCC/JJTree Examples
+
+### JavaCC Examples
+
+#### Example1
+
+> The `Example1` parser and others in this directory are designed to take input from standard input. `Example1` recognizes matching braces followed by zero or more line terminators and then an end of file.
+
+```java
+//
+PARSER_BEGIN(Example1)
+
+public class Example1 {
+    public static void main(String[] args) throws ParseException {
+        Example1 parser = new Example1(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example1)
+
+void Input() :
+{}
+{
+    MatchedBraces() ("\r" | "\n")* <EOF>
+}
+
+
+// 根据 bnf_production 的定义
+// void MatchedBraces() 中的 MatchedBraces 对应的类型是 java_identifier
+// 而 { "{" [ MatchedBraces() ] "}" } 内部，是一个 expansion_unit*
+// 而在 expansion_unit 的定义中，可以是
+// string_literal 对应 "{" 和 "}"
+// [ java_assignment_lhs "=" ] java_identifier "(" java_expression_list ")"
+// 对应 MatchedBraces()
+void MatchedBraces() :
+{}
+{
+    "{" [ MatchedBraces() ] "}"
+}
+```
+
+#### Example2
+
+> `Example2.jj` is a minor modification to `Example1.jj` to allow white space characters to be interspersed among the braces such that the following input will now be legal:
+
+```java
+//
+PARSER_BEGIN(Example2)
+
+public class Example2 {
+    public static void main(String[] args) throws ParseException {
+        Example2 parser = new Example2(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example2)
+
+void Input() : {}
+{
+    MatchedBraces() <EOF>
+}
+
+void MatchedBraces() : {}
+{
+    "{" [ MatchedBraces() ] "}"
+}
+
+
+SKIP : {
+    " "
+    | "\r"
+    | "\n"
+    | "\t"
+}
+```
+
+> - `debug_token_manager` debug TOKEN manager
+> - `debug_parser` debug parser
+
+#### Example3
+
+> 在原本的基础上，我们在每次递归的调用中输出了嵌套层级，以下是第一个实现。
+
+```java
+//
+PARSER_BEGIN(Example3)
+
+public class Example3 {
+    public static void main(String[] args) throws ParseException {
+        Example3 parser = new Example3(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example3)
+
+void Input() :
+{
+    int nested = 0;
+}
+{
+    MatchedBraces(nested) <EOF>
+}
+
+void MatchedBraces(int nestedValue) :
+{
+    System.out.println(nestedValue);
+    nestedValue = nestedValue + 1;
+}
+{
+    // 这里的代码不会报错
+    "{" [ MatchedBraces(nestedValue) ] "}"
+}
+
+SKIP : {
+    " "
+    | "\r"
+    | "\n"
+}
+```
+
+在这里，我们需要注意几个问题：
+
+1. 在 `bnf_production` 中，第一个 `{}` 对应于 `java_block`，这里可以写java代码，并且内部定义的变量仅在内部可以访问；
+2. 第二个 `{}` 对应于 `expansion_choices`，注意，这里有一个非常重要的点，`expansion_unit` 中虽然可以调用 `java_block` **但是javacc中的方法参数是不可变的。**。
+
+```java 
+void MatchedBraces(int nestedValue) :
+{
+  	// 这里不管递归多少次都是0
+    System.out.println(nestedValue);
+}
+{
+    "{" [ MatchedBraces(nestedValue++) ] "}"
+}
+```
+
+> `example3.jj` 统计嵌套层级
+
+```java
+//
+PARSER_BEGIN(Example3)
+
+public class Example3 {
+    public static void main(String[] args) throws ParseException {
+        Example3 parser = new Example3(System.in);
+        parser.Input();
+    }
+}
+PARSER_END(Example3)
+
+void Input() :
+{
+    int count;
+}
+{
+    count = MatchedBraces() <EOF>
+    {
+        System.out.println("The levels of nesting is : " + count);
+    }
+}
+
+
+int MatchedBraces() :
+{
+    int nested = 0;
+}
+{
+    // nested = MatchedBraces()
+    // 表示 expansion_unit 中的 [ java_assignment_lhs "=" ] regular_expression 部分
+    <LBRACE> [ nested = MatchedBraces() ] <RBRACE>
+
+    // java_block
+    {
+        return ++nested;
+    }
+}
+
+SKIP : {
+    " "
+    | "\r"
+    | "\n"
+}
+
+TOKEN : {
+    <LBRACE: "{">
+    | <RBRACE : "}">
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
