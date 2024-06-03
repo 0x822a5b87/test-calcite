@@ -87,6 +87,63 @@ regular_expr_production ::= [ lexical_state_list ]
 
  `regular_expr_production` 表示的含义是：在 lexical state == DEFAULT 状态下，如果读取到 " ", "\t", "\n", "\r", "\f", "/\*@egen\*/" 中任意一个字符，则直接跳过（由于 `regexpr_kind` 是 SKIP）。如果匹配到的是 `/*@egenn*/` 还会把 lexical state 转换为 `AFTER_EGEN`；
 
+### 在calculator中，如何解决可能出现的负数递归异常
+
+> 对于如下BNF
+>
+> ```java
+> Primary -> NUMBER
+>   				| PREVIOUS
+>   				| OPEN_PAR Expression CLOSE_PAR
+>   				| MINUS Primary
+> ```
+>
+> 负数可以无限递归，例如 `----100` 是合法的，如何避免这个问题呢？
+
+#### 第一种方式
+
+> 第一种方式是把Number单独抽取出来，这样可以避免不允许的递归。
+
+```java
+double Primary() throws NumberFormatException :
+{
+    Token t;
+    double value;
+}
+{
+    value=Number()
+    {
+        return value;
+    }
+    |
+    <PREVIOUS>
+    {
+        return previousValue;
+    }
+    |
+    <OPEN_PAR> value=Expression() <CLOSE_PAR>
+    {
+        return value;
+    }
+    |
+    <MINUS> value=Number()
+    {
+        return -value;
+    }
+}
+
+double Number() throws NumberFormatException :
+{
+    Token t;
+}
+{
+    t=<NUMBER>
+    {
+        return Double.parseDouble(t.image);
+    }
+}
+```
+
 ## Javacc介绍
 
 ### 如何使用 javacc
@@ -2082,6 +2139,349 @@ SKIP : {
 TOKEN : {
     <LBRACE: "{">
     | <RBRACE : "}">
+}
+```
+
+## JavaCC tutorial
+
+### adding_integer.jj
+
+实现可以递归的多数相加算法，但是在下面的写法中的33行中的`(<ADD> right=Add())*`，我们使用了递归，可以使用 LOOKAHEAD对其进行优化。
+
+```java
+options {
+    STATIC = false;
+}
+
+PARSER_BEGIN(Adder)
+
+public class Adder {
+    public static void main(String[] args) throws ParseException {
+      Adder parser = new Adder(System.in);
+      parser.Start();
+    }
+}
+PARSER_END(Adder)
+
+void Start() :
+{
+    int sum = 0;
+}
+{
+    sum=Add()
+    {
+
+        System.out.println("sum = " + sum);
+    }
+}
+
+int Add() :
+{
+    int left = 0;
+    int right = 0;
+}
+{
+    left=Number() (<ADD> right=Add())*
+    {
+        return left + right;
+    }
+}
+
+
+int Number() :
+{
+    Token t;
+    int num;
+}
+{
+    t=<NUM> {
+        num = Integer.parseInt(t.image);
+        return num;
+    }
+}
+
+TOKEN : {
+    <NUM : (["0"-"9"])+>
+    | <ADD : "+">
+}
+
+SKIP : {
+    " "
+    | "\t"
+    | "\r"
+    | "\n"
+}
+```
+
+> 下面是另外一个版本：
+>
+> 1. 在 `bnf_production` 中，我们可以随意的嵌套 `java_block`，也就是我们的 `{}` 中的内容；
+> 2. 在 `bnf_production` 最外层的 `java_block` 上声明的对象，在后续的整个 `expansion_choices` 都属于可用。
+
+```java
+options {
+    STATIC = false;
+}
+
+PARSER_BEGIN(Adder2)
+
+public class Adder2 {
+    public static void main(String[] args) throws ParseException {
+        Adder2 parser = new Adder2(System.in);
+        int value = parser.Start();
+        System.out.println(value);
+      }
+}
+PARSER_END(Adder2)
+
+int Start() :
+{
+    Token t;
+    int i;
+    int value;
+}
+{
+    t=<NUMBER>
+    {
+        i = Integer.parseInt(t.image);
+        value = i;
+    }
+    (
+    <ADD> t=<NUMBER>
+    {
+        i = Integer.parseInt(t.image);
+        value += i;
+    }
+    )*
+    <EOF>
+    {
+        return value;
+    }
+}
+
+TOKEN : {
+    <NUMBER: (["0"-"9"])+>
+    | <ADD : "+">
+}
+
+SKIP : {
+    " "
+    | "\t"
+    | "\r"
+    | "\n"
+}
+```
+
+以下是生成的 `Adder2.java` （parser）中的部分代码：
+
+```java
+  final public int Start() throws ParseException {Token t;
+    int i;
+    int value;
+    t = jj_consume_token(NUMBER);
+i = Integer.parseInt(t.image);
+        value = i;
+    label_1:
+    while (true) {
+      switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
+      case ADD:{
+        ;
+        break;
+        }
+      default:
+        jj_la1[0] = jj_gen;
+        break label_1;
+      }
+      jj_consume_token(ADD);
+      t = jj_consume_token(NUMBER);
+i = Integer.parseInt(t.image);
+        value += i;
+    }
+    jj_consume_token(0);
+{if ("" != null) return value;}
+    throw new Error("Missing return statement in function");
+}
+```
+
+### calculator
+
+> 以下是 `calculator` 的实现，在实现的过程中，我们定义几个 `bnf_production`。
+>
+> 1. `Start()` 使用 `<EOF>` 作为分隔符，可以读取多个不同的语句并输出；
+> 2. `Expression()` 读取一行表达式并计算结果后输出；
+> 3. `Primary()` 读取 Token 并解析为 double；
+> 4. `Term()` **这个是最重要的，简单来说就是将运算的左结合修改为右结合，优先去计算 `*` 和 `/`** 等高优先级的方法，当调用此方法时，如果下一个符号是 `*` 或者 `/` 则计算结果并返回，否则直接返回当前Token。从某种角度来将，这里有一点像，LOOKAHEAD(3)，找到第二个操作符，如果第二个操作符是 `*` huozhe  `/` 可以直接返回第二个操作数和第三个操作数的结果。如果不是，则正常计算 `+` 或者 `-` 的结果。
+>
+> 表达式可以表示为：
+>
+> 1. Expression -> Term (PLUS Term | MINUS Term)*
+> 2. Term -> Primary (TIMES Primary | DIVIDE Primary)
+
+```java
+options {
+    STATIC = false;
+}
+
+PARSER_BEGIN(Calculator)
+
+import java.io.PrintStream;
+import java.lang.NumberFormatException;
+
+public class Calculator {
+    public static void main(String[] args) throws ParseException {
+        Calculator parser = new Calculator(System.in);
+        // we put system
+        parser.Start(System.out);
+      }
+
+      // attention : this is visiable for all production because it is compiled into a variable in parser(Calculator.java)
+      double previousValue;
+}
+PARSER_END(Calculator)
+
+SKIP : {" "}
+TOKEN : {
+    <EOL : "\n" | "\r" | "\r\n">
+    | <PLUS: "+">
+    | <MINUS: "-">
+    | <TIMES : "*">
+    | <DIVIDE : "/">
+    | < NUMBER : <DIGIT>
+        | <DIGIT> "." <DIGIT>
+        | <DIGIT> "."
+        | "." <DIGIT>
+        >
+    | <#DIGIT : (["0"-"9"])+>
+}
+
+
+// Start -> (Expression EOL)* EOF
+// Expression -> Term(PLUS Term | MINUS Term)
+// Term -> Primary(TIMES Primary | DIVIDE Primary)*
+void Start(PrintStream printStream) throws NumberFormatException: {}
+{
+    (
+      previousValue = Expression() <EOL>
+      {
+          printStream.println(previousValue);
+      }
+    )*
+    <EOF>
+}
+
+double Expression() :
+{
+    double i;
+    double value;
+}
+{
+    value=Term()
+    (
+        (
+            <PLUS>
+            i=Term()
+            { value += i; }
+        )
+        |
+        (
+            <MINUS>
+            i=Term()
+            { value -= i;}
+        )
+    )
+    *
+
+    {
+        return value;
+    }
+}
+
+double Primary() throws NumberFormatException :
+{
+    Token t;
+}
+{
+    t=<NUMBER>
+    {
+        return Double.parseDouble(t.image);
+    }
+}
+
+double Term():
+{
+    double i;
+    double value;
+}
+{
+    value = Primary()
+    (
+        (
+            <TIMES>
+            i=Primary()
+            { value *= i;}
+        )
+        |
+        (
+            <DIVIDE>
+            i=Primary()
+            { value /= i;}
+        )
+    )*
+
+    {
+        return value;
+    }
+}
+```
+
+#### 1.3.6  Adding parentheses, a unary operator, and history
+
+> there is no need add a regular production of negation, since the hyphen character is already recognized as a token of kind `MINUS`
+>
+> So, the BNF notation we have :
+>
+> 
+>
+> the BNF production is recursive in two ways:
+>
+> 1. The last alternative is direct recursive;
+> 2. The second last alternative is indirectly recursive,since `Expression` ultimately depends on `Primary`. 
+
+```java
+Primary -> NUMBER
+  				| PREVIOUS
+  				| OPEN_PAR Expression CLOSE_PAR
+  				| MINUS Primary
+```
+
+so all we need to do is to edit the `Primary` to do a recursive parse like :
+
+```java
+double Primary() throws NumberFormatException :
+{
+    Token t;
+    double value;
+}
+{
+    t=<NUMBER>
+    {
+        return Double.parseDouble(t.image);
+    }
+    |
+    <PREVIOUS>
+    {
+        return previousValue;
+    }
+    |
+    <OPEN_PAR> value=Expression() <CLOSE_PAR>
+    {
+        return value;
+    }
+    |
+    <MINUS> value=Primary()
+    {
+        return -value;
+    }
 }
 ```
 

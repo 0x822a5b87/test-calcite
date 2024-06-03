@@ -1,0 +1,144 @@
+options {
+    STATIC = false;
+}
+
+PARSER_BEGIN(Calculator)
+
+import java.io.PrintStream;
+import java.lang.NumberFormatException;
+
+public class Calculator {
+    public static void main(String[] args) throws ParseException {
+        Calculator parser = new Calculator(System.in);
+        // we put system
+        parser.Start(System.out);
+      }
+
+      // attention : this is visiable for all production because it is compiled into a variable in parser(Calculator.java)
+      double previousValue;
+}
+PARSER_END(Calculator)
+
+SKIP : {" "}
+
+TOKEN : {
+    <EOL : "\n" | "\r" | "\r\n">
+    | < NUMBER : <DIGIT>
+        | <DIGIT> "." <DIGIT>
+        | <DIGIT> "."
+        | "." <DIGIT>
+        >
+    | <#DIGIT : (["0"-"9"])+>
+}
+
+TOKEN : {
+    <PLUS: "+">
+    | <MINUS: "-">
+    | <TIMES : "*">
+    | <DIVIDE : "/">
+}
+
+TOKEN : {
+    <OPEN_PAR: "(">
+    | <CLOSE_PAR: ")">
+}
+
+TOKEN : {
+    <PREVIOUS: "$">
+}
+
+
+// Start -> (Expression EOL)* EOF
+// Expression -> Term(PLUS Term | MINUS Term)
+// Term -> Primary(TIMES Primary | DIVIDE Primary)*
+void Start(PrintStream printStream) throws NumberFormatException: {}
+{
+    (
+      previousValue = Expression() <EOL>
+      {
+          printStream.println(previousValue);
+      }
+    )*
+    <EOF>
+}
+
+double Expression() :
+{
+    double i;
+    double value;
+}
+{
+    value=Term()
+    (
+        (
+            <PLUS>
+            i=Term()
+            { value += i; }
+        )
+        |
+        (
+            <MINUS>
+            i=Term()
+            { value -= i;}
+        )
+    )
+    *
+
+    {
+        return value;
+    }
+}
+
+double Primary() throws NumberFormatException :
+{
+    Token t;
+    double value;
+}
+{
+    t=<NUMBER>
+    {
+        return Double.parseDouble(t.image);
+    }
+    |
+    <PREVIOUS>
+    {
+        return previousValue;
+    }
+    |
+    <OPEN_PAR> value=Expression() <CLOSE_PAR>
+    {
+        return value;
+    }
+    |
+    <MINUS> value=Primary()
+    {
+        return -value;
+    }
+}
+
+double Term():
+{
+    double i;
+    double value;
+}
+{
+    value = Primary()
+    (
+        (
+            <TIMES>
+            i=Primary()
+            { value *= i;}
+        )
+        |
+        (
+            <DIVIDE>
+            i=Primary()
+            { value /= i;}
+        )
+    )*
+
+    {
+        return value;
+    }
+}
+

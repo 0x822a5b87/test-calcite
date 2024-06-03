@@ -1,0 +1,51 @@
+options {
+    STATIC = false;
+}
+
+PARSER_BEGIN(Adder2)
+
+public class Adder2 {
+    public static void main(String[] args) throws ParseException {
+        Adder2 parser = new Adder2(System.in);
+        int value = parser.Start();
+        System.out.println(value);
+      }
+}
+PARSER_END(Adder2)
+
+int Start() :
+{
+    Token t;
+    int i;
+    int value;
+}
+{
+    t=<NUMBER>
+    {
+        i = Integer.parseInt(t.image);
+        value = i;
+    }
+    (
+    <ADD> t=<NUMBER>
+    {
+        i = Integer.parseInt(t.image);
+        value += i;
+    }
+    )*
+    <EOF>
+    {
+        return value;
+    }
+}
+
+TOKEN : {
+    <NUMBER: (["0"-"9"])+>
+    | <ADD : "+">
+}
+
+SKIP : {
+    " "
+    | "\t"
+    | "\r"
+    | "\n"
+}
