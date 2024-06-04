@@ -4,6 +4,8 @@ options {
 
 PARSER_BEGIN(Calculator)
 
+package com.xxx.generated.calculator;
+
 import java.io.PrintStream;
 import java.lang.NumberFormatException;
 
