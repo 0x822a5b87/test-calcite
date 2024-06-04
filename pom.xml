@@ -27,6 +27,7 @@
     <modules>
         <module>06-parser-example</module>
         <module>06-calcite-parser-example</module>
+        <module>javacc</module>
     </modules>
 
     <dependencies>

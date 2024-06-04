@@ -1,8 +1,8 @@
 package com.xxx;
 
-import com.xxx.generated.ParseException;
 import com.xxx.generated.lexical.MyLexical;
 import com.xxx.generated.lexical.MyLexicalConstants;
+import com.xxx.generated.lexical.ParseException;
 import com.xxx.generated.lexical.Token;
 
 import java.io.StringReader;

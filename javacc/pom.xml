@@ -11,7 +11,29 @@
 
     <artifactId>test-javacc</artifactId>
 
+    <properties>
+        <antlr4.version>4.9.3</antlr4.version>
+
+        <antlr4.package.name>com.xxx.g4.example</antlr4.package.name>
+    </properties>
+
     <dependencies>
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr4.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.calcite</groupId>
+            <artifactId>calcite-core</artifactId>
+            <version>1.32.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.xxx.calcite</groupId>
+            <artifactId>06-calcite-parser-example</artifactId>
+            <version>1.0</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -46,6 +68,37 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- antlr4 plugin -->
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>4.9.3</version>
+                <configuration>
+                    <arguments>
+                        <argument>-package</argument>
+                        <argument>${antlr4.package.name}</argument>
+                    </arguments>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>antlr4</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>antlr4</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirectory>${basedir}/src/main/g4</sourceDirectory>
+                            <includes>
+                                <include>**/*.g4</include>
+                            </includes>
+                            <outputDirectory>${basedir}/generated-sources/${antlr4.package.name}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+
+            </plugin>
+
 
             <!-- add generated sources code to classpath -->
             <plugin>

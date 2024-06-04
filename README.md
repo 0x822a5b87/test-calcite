@@ -799,3 +799,130 @@ classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dash
 
 
 ### 6.3 JavaCC
+
+参考 [javacc](./javacc.md)
+
+### 6.4 Calcite整合Antlr方法
+
+#### 设置maven插件
+
+Antlr4 的依赖包含运行时依赖和插件依赖，运行时依赖较为简单我们只说插件依赖。
+
+> 1. 我们在插件依赖中指定了 `-package` 引用一个特定的包名；
+> 2. 我们声明了一个 `antlr4` 的 `execution`，并且绑定到 `phase` = `generate-sources`，`goal=antlr4` 上；
+> 3. 指定了输入文件夹和输出文件夹，并且输出文件夹绑定到了 `-package` 对应的包下。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <dependencies>
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4</artifactId>
+            <version>4.11.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr4.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- antlr4 plugin -->
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>4.3</version>
+                <configuration>
+                    <arguments>
+                        <argument>-package</argument>
+                        <argument>${antlr4.package.name}</argument>
+                    </arguments>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>antlr4</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>antlr4</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirectory>${basedir}/src/main/g4</sourceDirectory>
+                            <includes>
+                                <include>**/*.g4</include>
+                            </includes>
+                            <outputDirectory>${basedir}/generated-sources/${antlr4.package.name}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+
+
+> 使用antlr4匹配LOAD语法
+>
+> ```
+> LOAD hdfs:'default/user.txt' TO mysql:'db.t_user' (name name, age age) SEPARATOR ','
+> ```
+
+```java
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
