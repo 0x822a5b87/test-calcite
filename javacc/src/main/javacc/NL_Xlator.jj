@@ -1,5 +1,7 @@
 PARSER_BEGIN(NL_Xlator)
 
+package com.xxx.generated.nl;
+
 /**
  * New line translator.
  */

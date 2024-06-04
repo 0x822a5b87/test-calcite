@@ -1,5 +1,7 @@
 PARSER_BEGIN(IdList)
 
+package com.xxx.generated.id;
+
 /**
  * ID lister.
  */

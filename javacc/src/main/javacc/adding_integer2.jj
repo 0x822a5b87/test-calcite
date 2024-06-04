@@ -4,6 +4,9 @@ options {
 
 PARSER_BEGIN(Adder2)
 
+package com.xxx.generated.calculator2;
+
+
 public class Adder2 {
     public static void main(String[] args) throws ParseException {
         Adder2 parser = new Adder2(System.in);

@@ -3,7 +3,7 @@ options {
 
 PARSER_BEGIN(Example)
 
-package com.xxx.generated;
+package com.xxx.generated.braces;
 
 /** Simple brace matcher. */
 public class Example {

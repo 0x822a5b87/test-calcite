@@ -1,6 +1,8 @@
 //
 PARSER_BEGIN(Example1)
 
+package com.xxx.generated.example1;
+
 public class Example1 {
     public static void main(String[] args) throws ParseException {
         Example1 parser = new Example1(System.in);
