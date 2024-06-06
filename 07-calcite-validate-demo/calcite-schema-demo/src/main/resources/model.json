@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "defaultSchema": "MYSQL",
+  "schemas": [
+    {
+      "name": "MYSQL",
+      "type": "custom",
+      "factory": "com.xxx.calcite.mysql.MyMysqlSchemaFactory",
+      "operand": {
+        "url": "jdbc:mysql://localhost:3306/db_cdm",
+        "user": "root",
+        "pass": "123456"
+      },
+      "functions": [
+        {
+          "name": "test",
+          "className": "com.xxx.calcite.function.MyFunction",
+          "methodName": "test"
+        }
+      ],
+      "tables": [
+        {
+          "name": "v_num",
+          "type": "view",
+          "sql": "select 1+2*3",
+          "path": [
+            "MYSQL"
+          ],
+          "modifiable": false
+        }
+      ]
+    }
+  ]
+}

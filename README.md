@@ -876,21 +876,257 @@ Antlr4 的依赖包含运行时依赖和插件依赖，运行时依赖较为简�
 
 ```
 
+## 第7章-校验层
+
+### 7.1 何谓校验
+
+查询执行需要根据**元数据信息**来进行校验例如：
+
+1. 完善语义信息，例如将 select * 转换为合法的字段；
+2. 确认语义是否合法，例如确认 select id from login group by id; 需要确认语句中的login是否存在，id是否存在 group by id是否合法；
+
+```mermaid
+flowchart LR
+	Sql --> 解析层 -->|输出| SqlNode --> RelNode
+	metadata --> RelNode
+```
+
+
+
+### 7.2 元数据定义
+
+#### 7.2.1 calcite中元数据的基本概念
+
+```mermaid
+flowchart LR
+	calcite --> Model1
+	calcite --> Model2
+	calcite --> Model3[...]
+	
+	Model1 --> Schema1
+	Model1 --> Schema2
+	Model1 --> Schema3[...]
+	
+	Model2 --> Schema4
+	Model2 --> Schama5
+	Model2 --> Schame6[...]
+	
+	Schema1 --> Table1
+	Schema1 --> Table2[...]
+	
+	Schema2 --> Table3
+	Schema2 --> Table4[...]
+
+	Schema4 --> Table5
+	Schema4 --> Table6[...]
+	
+  Schama5 --> Table7
+	Schama5 --> Table8[...]
+```
+
+##### 1. Model
+
+> 暂时不支持图数据库模型
+
+```mermaid
+flowchart LR
+	Calcite --> 关系模型 -->|拉取| 内存 
+	Calcite --> KV模型 -->|拉取| 内存
+	Calcite --> 文档模型 -->|拉取| 内存
+	
+	内存 --> 统一关系模型
+```
 
 
 
 
 
+##### 2. Schema
+
+> Schema : `a persistent, named collection of descriptor`。
+>
+> 
+>
+> 包含了表、列、数据类型、视图、存储过程、关系、主键、外键等概念。
+
+##### 3. Table
+
+calcite中，它的表是关系代数中的表格 -- 由一些约束条件进行约束的二维数组集。
+
+#### 7.2.2 数据模型（Model）定义
+
+```mermaid
+flowchart LR
+	Calcite --> JSON/YAML --> Map["Map(默认)"]:::important
+	JSON/YAML --> JDBC
+	JSON/YAML --> CUSTOM
+	
+classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
 
 
 
 
 
+> model.json
+
+```json
+{
+  "version": "1.0",
+  "defaultSchema": "MYSQL",
+  "schemas": [
+  ]
+}
+```
+
+##### custom
+
+```mermaid
+flowchart LR
+	Custom --> factory
+	Custom --> operand
+	Custom --> functions
+	Custom --> tables
+```
 
 
 
+```json
+    {
+      "name": "MYSQL",
+      "type": "custom",
+      "factory": "cn.com.ptpress.cdm.schema.mysql.MysqlSchemaFactory",
+      "operand": {
+        "url": "jdbc:mysql://localhost:3306/db_cdm",
+        "user": "root",
+        "pass": "root"
+      },
+      "functions": [
+        {
+          "name": "test",
+          "className": "cn.com.ptpress.cdm.schema.function.MyFunction",
+          "methodName": "test"
+        }
+      ],
+      "tables": [
+        {
+          "name": "v_num",
+          "type": "view",
+          "sql": "select 1+2*3",
+          "path": [
+            "MYSQL"
+          ],
+          "modifiable": false
+        }
+      ]
+    }
+```
+
+#### 7.2.3 自定义表元数据实现
+
+```mermaid
+flowchart LR
+	SchemaFactory -->|create| Schema
+	Schema -->|namespace for| Table
+	Schema -->|namespace for| functions
+```
 
 
+
+所以，如果我们需要定义一个自己的 `Schema`，我们至少需要定义三个类：
+
+1. SchemaFactory
+2. Schema
+3. Table
+
+##### SchemaFactory
+
+>Factory for Schema objects.
+>A schema factory allows you to include a custom schema in a model file. For example, here is a model that contains a custom schema whose tables read CSV files. (See the example CSV adapter  for more details about this particular adapter.)
+>
+>```json
+>{
+>    "version": "1.0",
+>    "defaultSchema": "SALES",
+>    "schemas": [
+>        {
+>            "name": "SALES",
+>            "type": "custom",
+>            "factory": "org.apache.calcite.adapter.csv.CsvSchemaFactory",
+>            "mutable": true,
+>            "operand": {
+>                "directory": "sales"
+>            },
+>            "tables": [
+>                {
+>                    "name": "FEMALE_EMPS",
+>                    "type": "view",
+>                    "sql": "SELECT * FROM emps WHERE gender = 'F'"
+>                }
+>            ]
+>        }
+>    ]
+>}
+>```
+>
+>
+
+```java
+public interface SchemaFactory {
+  /** Creates a Schema.
+   *
+   * @param parentSchema Parent schema
+   * @param name Name of this schema
+   * @param operand The "operand" JSON property
+   * @return Created schema
+   */
+  Schema create(
+      SchemaPlus parentSchema,
+      String name,
+      Map<String, Object> operand);
+}
+```
+
+##### 一个简单的使用calcite映射mysql到calcite的实例
+
+```mermaid
+flowchart TD
+
+	`model.json` -->|config| SchemaFactory
+	
+	subgraph SchemaGraph[Schema]
+		SchemaFactory -->|create| Schema
+	end
+
+	subgraph TableGraph[Table]
+		MyTable -->|inherit| AbstractTable
+		MyTable -->|contains| MyTableColumns
+	end
+
+	subgraph columnsGraph[Columns]
+		direction LR
+		subgraph columns1[columns1]
+			ColumnName1[ColumnName1]
+			ColumnType1[ColumnType]
+		end
+		subgraph columns2[columns2]
+			ColumnName2[ColumnName]
+			ColumnType2[ColumnType]
+		end
+		subgraph columns3[...]
+			ColumnName3[...]
+			ColumnType3[...]
+		end
+	end
+	
+	TableGraph --> columnsGraph
+	
+	Schema -->|getTableMap| MyTable
+```
+
+
+
+### 7.3 校验流程
 
 
 

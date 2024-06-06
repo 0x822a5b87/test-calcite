@@ -1,4 +1,4 @@
-package com.xxx.generated;
+package com.xxx;
 
 import com.xxx.generated.lookahead.Lookahead;
 import com.xxx.generated.lookahead.ParseException;
