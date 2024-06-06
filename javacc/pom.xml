@@ -28,12 +28,6 @@
             <artifactId>calcite-core</artifactId>
             <version>1.32.0</version>
         </dependency>
-        <dependency>
-            <groupId>com.xxx.calcite</groupId>
-            <artifactId>06-calcite-parser-example</artifactId>
-            <version>1.0</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
 
     <build>

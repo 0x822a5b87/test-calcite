@@ -1089,6 +1089,12 @@ public interface SchemaFactory {
 
 ##### 一个简单的使用calcite映射mysql到calcite的实例
 
+> 使用如下代码进入 SchemaFactory
+>
+> ```java
+> DriverManager.getConnection("jdbc:calcite:model=src/main/resources/model.json")
+> ```
+
 ```mermaid
 flowchart TD
 
@@ -1126,7 +1132,115 @@ flowchart TD
 
 
 
-### 7.3 校验流程
+## 第8章 - 优化层
+
+### 8.1 关系代数与火山模型
+
+```sql
+# 原始SQL
+SELECT t1.id,
+       t2.name
+FROM t1
+JOIN t2 ON t1.id=t2.id
+WHERE t1.socre = 90;
+```
+
+可以被转换为如下代数模型
+
+
+
+```mermaid
+flowchart TD
+	Scan1[Scan: t1] --> Join[Join: t1.id=t2.id]
+	Scan2[Scan: t2] --> Join
+	Join --> Filter[Filter: t1.score=90]
+	Filter --> Project[Project: t1.id, t2.name]
+```
+
+
+
+
+
+经过优化之后可以变成
+
+```mermaid
+flowchart TD
+	Scan1 --> Filter[Filter: t1.score=90]
+	Filter --> Project1[Project: t1.id]
+	Project1 --> Join[Join: t1.id=t2.id]
+	Scan2[Scan: t2] --> Project[Project: t2.id,t2.name] --> Join
+```
+
+### 8.2 优化器
+
+#### 8.2.2 RBO(Rule-Based Optimizer) and CBO(Cost-Based Optimizer)
+
+> - `RBO` A Rule-Based Optimizer (RBO) is a component in a database management system (DBMS) that determines the most efficient way to execute a database query **by following a set of predefined rules**
+> - `CBO` The cost-based optimizer uses **metadata and statistics** to estimate the amount of processing (memory, CPU, network traffic, and I/O) required for each operation.
+
+##### RBO
+
+> 当匹配到一个节点，父节点是 join 子节点是 filter，我们就可以转换为父节点为 filter，子节点为 join
+
+```mermaid
+flowchart LR
+	input -->|RBO| output
+
+	subgraph input
+		Filter0[Filter] --> Join0[Join]
+	end
+	
+	subgraph output
+		Join1[Join] --> Filter1[Filter]
+	end
+```
+
+##### CBO
+
+1. Hash Join 利用连接键的hash值分桶存储链接表
+2. Nested Join 将一个表存在内存，并循环从另外的表查询数据并连接
+3. Sort Merge Join 先将关联表的关联各自排序，然后从各自排序表抽取数据并连接
+
+```mermaid
+flowchart LR
+	Join --> HashJoin[Hash Join]
+	Join --> NestedJoin[Nested Join]
+	Join --> SortMergeJoin[Sort Merge Join]
+```
+
+#### 8.2.3 寻找关系代数最优解
+
+在寻找最优解的过程中，可能会同时匹配多个优化规则，也可能优化完之后可以继续优化，一般使用贪心算法来得出相对最优解而不追求全局最优解。这个是非常合理的，因为我们优化本身的代价也需要考虑在内。
+
+### 8.3 calcite优化器
+
+```mermaid
+classDiagram
+	  note "RBO模型和CBO模型"
+    RelOptPlanner <|-- AbstactRelOptPlanner
+    AbstactRelOptPlanner <|-- HepPlanner
+    AbstactRelOptPlanner <|-- VolcanoPlaner
+```
+
+#### 8.3.1 构建算子树
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

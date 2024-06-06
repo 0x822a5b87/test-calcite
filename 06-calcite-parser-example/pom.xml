@@ -10,6 +10,7 @@
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>06-calcite-parser-example</artifactId>
+    <version>1.0.0</version>
 
     <build>
         <plugins>
