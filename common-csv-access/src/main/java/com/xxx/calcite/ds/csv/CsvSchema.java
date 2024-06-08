@@ -20,7 +20,7 @@ public class CsvSchema extends AbstractSchema {
 
     @Override
     protected Map<String, Table> getTableMap() {
-        //获取resources下的每隔csv文件，并为其创建CSV表结构
+        //获取resources下的每个csv文件，并为其创建CSV表结构
         for (String dataFile : dataFiles.split(",")) {
             URL url = ClassLoader.getSystemClassLoader().getResource(dataFile);
             assert url != null;

@@ -3,22 +3,174 @@
 
 ## QA
 
+### 整个calcite的解析过程是怎么样的？
+
+> calcite解析可以分为一下几个步骤：
+>
+> 1. 输入字符串，使用 parser.jj 中定义的语法规则进行词法分析和语法分析，生成 tokens 和语法树。语法树中的节点都是 SqlNode 及其子类，代表了输入查询的语义结构。
+> 2. 在逻辑查询计划阶段，将语法树中的 SqlNode 转换成 RelNode，RelNode 是 Calcite 中的逻辑查询计划节点，表示了查询的逻辑结构。这一阶段会进行一些简单的优化，如常量折叠、谓词下推等，**这个阶段主要是基于RBO进行优化**。
+> 3. 经过逻辑查询计划阶段后，进入查询优化阶段。在这个阶段，Calcite 会使用一系列的优化规则和算法对 RelNode 进行优化，包括但不限于谓词下推、投影消除、连接重排序、等价转换等。优化的目标是尽可能地提高查询性能、减少资源消耗，**这个阶段主要基于CBO优化。**。
+> 4. 最后，在查询优化阶段结束后，Calcite 会生成最终的物理执行计划。物理执行计划是由一系列的物理算子组成，代表了查询的具体执行方式，例如扫描表、连接操作、聚合操作等。物理执行计划会考虑底层存储引擎的特点和限制，以及查询的成本模型，选择最优的执行策略。
+>
+> 具体如下图所示。
+
+```mermaid
+flowchart LR
+	
+	SQL -->|文本| parserGraph
+	parserGraph -->|"AST(SqlNode)"| logicalQueryPlanGraph
+	logicalQueryPlanGraph -->|logical query plan| queryOptimizeGraph
+	queryOptimizeGraph -->|PhysicalNode| physicalPlanGraph
+
+	subgraph parserGraph
+		parser.jj -->|text| lexer[lexer/tokenizer] -->|tokens| parser
+	end
+	
+	subgraph logicalQueryPlanGraph[逻辑查询计划]
+		HepPlanner -->|RBO| RBO-LogicalQueryPlan 
+	end
+	
+	subgraph queryOptimizeGraph[查询优化]
+		VolcanoPlanner -->|CBO| CBO-LogicalQueryPlan
+	end
+	
+	subgraph physicalPlanGraph
+		PhysicalPlanner
+	end
+```
+
+每个步骤涉及到的类如下：可以看到的是，在解析和逻辑计划阶段，其实都是与平台无关的，而到了物理机执行计划阶段，则会针对平台实现，例如我们下图中会存在Jdbc相关的类。
+
+```mermaid
+flowchart TD
+	calcite --> parser
+	calcite --> logicalPlan
+	calcite --> physicalPlan
+	
+	parser --> SqlNode
+	parser --> SqlAlter
+	parser --> SqlCall
+	parser --> Sql[...]
+	
+	logicalPlan --> RelNode
+	logicalPlan --> LogicalProject
+	logicalPlan --> LogicalTableScan
+	logicalPlan --> Logical[...]
+	
+	physicalPlan --> PhysicalNode
+	physicalPlan --> JdbcProject
+	physicalPlan --> JdbcTableScan
+	physicalPlan --> Physical[...]
+```
+
+
+
 ### SqlOperator 和 SqlCall 的区别是什么
 
 ### 如何使用maven基于JavaCC生成解析类 && 如何将生成的解析类依赖加入到maven项目中
 
-### 如何使用模板引擎来扩展语法文件
+```xml
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>javacc-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <id>javacc</id>
+                        <goals>
+                            <goal>javacc</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirectory>${basedir}/src/main/javacc</sourceDirectory>
+                            <includes>
+                                <include>**/*.jj</include>
+                            </includes>
+                            <lookAhead>2</lookAhead>
+                            <isStatic>false</isStatic>
+                            <outputDirectory>${basedir}/generated-sources/</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
-### SqlCall#unparse(SqlWriter writer, int leftPrec, int rightPrec) 有什么用？
 
-> 如何通过模板引擎扩展实现以下SQL，SQL的功能是从一个source到处数据到另一个source。
+            <!-- add generated sources code to classpath -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${basedir}/src/main/java/</source>
+                                <source>${basedir}/generated-sources/</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- clean generated sources when run command 'mvn clean' -->
+            <plugin>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>2.4.1</version>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>${basedir}/generated-sources</directory>
+                            <includes>
+                                <include>**/*</include>
+                            </includes>
+                            <followSymlinks>false</followSymlinks>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
+        </plugins>
+```
+
+### SqlBasicCall和RexCall有什么区别？
+
+> `RexCall` 和 `SqlBasicCall` 都表示函数调用，但是：
 >
-> ```sql
-> LOAD hdfs:'/data/user.txt' TO mysql:'db.t_user' (name name, age age) SEPARATOR ','
-> ```
->
+> 1. `RexCall` 在**logic query planner stage**生成，用于表示**查询计划**中的各种表达式（这个阶段我也会基于表达式去进行 `logic plan optimize`）；
+> 2. `SqlBasicCall` 在 **SQL解析阶段**生成，用于表达**SQL查询语句**中的各种表达式。
 
-#### 为什么不把 `SqlLoadSource` 定义成一个 `SqlNode` 呢？
+在 Calcite 中，`RexCall` 和 `SqlBasicCall` 都是表示函数调用的类，但它们在 Calcite 的不同层次中扮演不同的角色。
+
+1. `RexCall`:
+   - `RexCall` 是 Calcite 中的一个类，用于表示表达式中的函数调用。
+   - 它是 `RexNode` 接口的一个实现，用于表示**表达式树**中的函数调用节点。
+   - `RexCall` 可以表示各种函数调用，包括内置函数和用户自定义函数。
+   - 它提供了访问函数名称、参数列表和其他相关信息的方法。
+2. `SqlBasicCall`:
+   - `SqlBasicCall` 是 Calcite 中的一个类，用于表示 **SQL 解析树**中的函数调用。
+   - 它是 `SqlNode` 接口的一个实现，用于表示 SQL 解析树中的函数调用节点。
+   - `SqlBasicCall` 用于表示 SQL 查询中的函数调用，例如 SELECT、WHERE、GROUP BY 等子句中的函数调用。
+   - 它提供了访问函数名称、参数列表和其他相关信息的方法。
+
+总结来说，`RexCall` 是 Calcite 中用于表示表达式树中的函数调用的类，而 `SqlBasicCall` 是 Calcite 中用于表示 SQL 解析树中的函数调用的类。它们在 Calcite 的不同层次中扮演不同的角色，但都用于表示函数调用。
+
+可以看到，这里提到了两个不同的阶段：`表达式树`和`SQL解析树`两个阶段。表达式树和 SQL 解析树中的函数调用有一些区别，并且它们在不同的阶段生成。
+
+1. 表达式树中的函数调用：
+   - 表达式树是在查询优化阶段生成的，用于表示查询计划中的各种表达式。
+   - 函数调用在表达式树中表示为 `RexCall` 对象，用于表示函数的调用和参数。
+   - 表达式树中的函数调用可以包括内置函数和用户自定义函数，用于执行各种计算和操作。
+2. SQL 解析树中的函数调用：
+   - SQL 解析树是在 SQL 解析阶段生成的，用于表示 SQL 查询语句的结构和语义。
+   - 函数调用在 SQL 解析树中表示为 `SqlBasicCall` 对象，用于表示 SQL 查询语句中的函数调用。
+   - SQL 解析树中的函数调用用于表示 SQL 查询语句中的函数调用，例如 SELECT、WHERE、GROUP BY 等子句中的函数调用。
+
+> 总结来说，表达式树中的函数调用用于表示查询计划中的各种表达式，而 SQL 解析树中的函数调用用于表示 SQL 查询语句中的函数调用。它们在不同的阶段生成，表达式树在查询优化阶段生成，而 SQL 解析树在 SQL 解析阶段生成。
 
 ## 第三章 - sqlline
 
@@ -1223,6 +1375,530 @@ classDiagram
 ```
 
 #### 8.3.1 构建算子树
+
+##### config()
+
+```java
+    public static Frameworks.ConfigBuilder config() {
+        return config("data.csv");
+    }
+
+    public static Frameworks.ConfigBuilder config(String dataFile) {
+        // create a root schema
+        final SchemaPlus rootSchema = Frameworks.createRootSchema(true);
+        SchemaPlus rootSchemaPlus = rootSchema.add("csv", new CsvSchema(dataFile));
+        return Frameworks.newConfigBuilder()
+                         // define the configuration for a SQL parser, use Oracle lexer
+                         .parserConfig(SqlParser.Config.DEFAULT)
+                         // add schema csv, and table name data to rootSchema
+                         .defaultSchema(rootSchemaPlus);
+    }
+```
+
+```java
+    @Test
+    public void joinTest() {
+        final FrameworkConfig config = MyRelBuilder.config().build();
+        final RelBuilder builder = RelBuilder.create(config);
+        final RelNode left = builder
+                .scan("STUDENT")
+                .scan("SCORE")
+                .join(JoinRelType.INNER, "ID")
+                .build();
+
+        final RelNode right = builder
+                .scan("CITY")
+                .scan("SCHOOL")
+                .join(JoinRelType.INNER, "ID")
+                .build();
+
+        final RelNode result = builder
+                .push(left)
+                .push(right)
+                .join(JoinRelType.INNER, "ID")
+                .build();
+        System.out.println(RelOptUtil.toString(result));
+    }
+
+```
+
+以上代码将会构建如下算子树
+
+```mermaid
+flowchart TD
+
+scan1[Scan STUDENT]
+scan2[Scan SCORE]
+scan1 --> join1[join]
+scan2 --> join1
+
+scan3[Scan STUDENT]
+scan4[Scan SCORE]
+scan3 --> join2[join]
+scan4 --> join2
+
+join1 --> join3[join]
+join2 --> join3
+```
+
+#### 8.3.2 RelNode
+
+> A `RelNode` is a relation Expression created in `Logical Query Planner Stage` and used in `Optimize Stage`.
+
+```mermaid
+classDiagram
+		note "RelOptNode is node in planner"
+    RelOptNode <|-- RelNode
+    Clonable <|-- RelNode
+	  note "A RelNode is a relational Expression"
+	  RelNode <|-- Project
+    RelNode <|-- Sort
+    RelNode <|-- Join
+    RelNode <|-- Filter
+    RelNode <|--  TableScan
+```
+
+```mermaid
+classDiagram
+	note "RexNode is a row Expression, Rex stands for row-expression"
+	RexNode <|-- RexVariable
+	RexNode <|-- RexCall
+	RexNode <|--RexLiteral
+	RexVariable <|-- RexInputRef
+	RexVariable <|-- RexLocalRef
+```
+
+#### 8.3.3 Calcite优化模型
+
+##### HepPlanner
+
+在 HepPlanner 的优化过程中，有一些重要的类：
+
+1. `OperandBuilder` ：Callback to create an operand.
+2. `Done` Indicates that an operand is complete.
+3. `OperandTransform extends Function<OperandBuilder, Done>` ，继承了 Function 的 `apply` 方法，接收一个 `OperandBuilder` 参数并返回 `Done`.
+4. `RelRule.Config` inner class of RelRule, indicate a rule configuration.
+5. `FilterJoinRule.Config extends RelRule.Config` inner class of FilterJoinRule, indicate a rule configuration but contains more function.
+
+> 在 `RelRule.Config` 中有一些常用的方法和变量：
+>
+> 1. `EMPTY` 通常用于构造一个新的规则；
+> 2. `as` 将当前对象拷贝到一个新的对象并返回；
+> 3. `withOperandSupplier` 设置 OperandTransform；
+
+```java
+  /** Rule configuration. */
+  public interface Config {
+    /** Empty configuration. */
+    RelRule.Config EMPTY = ImmutableBeans.create(Config.class)
+        .withRelBuilderFactory(RelFactories.LOGICAL_BUILDER)
+        .withOperandSupplier(b -> {
+          throw new IllegalArgumentException("Rules must have at least one "
+              + "operand. Call Config.withOperandSupplier to specify them.");
+        });
+
+    /** Creates a rule that uses this configuration. Sub-class must override. */
+    RelOptRule toRule();
+
+    /** Casts this configuration to another type, usually a sub-class. */
+    default <T> T as(Class<T> class_) {
+      return ImmutableBeans.copy(class_, this);
+    }
+
+    /** Creates the operands for the rule instance. */
+    @ImmutableBeans.Property
+    OperandTransform operandSupplier();
+
+    /** Sets {@link #operandSupplier()}. */
+    Config withOperandSupplier(OperandTransform transform);
+  }
+```
+
+> 下面给到了一个构造 rule 的实例。
+
+```java
+    public interface Config extends FilterJoinRule.Config {
+        // 使用 RelRule.Config 构造一个新的 rule
+        FilterJoinRule.FilterIntoJoinRule.Config DEFAULT = EMPTY
+                // 设置 OperandSupplier，可以使用它来创建一个规则，而在 Rule 中我们会使用这个被创建的规则匹配输入的规则
+                // 下面的规则表示：
+                // 1. 输入 RelNode 类型为 Filter
+                // 2. 输入 RelNode 包含一个输入，并且输入RelNode类型为Join
+                // 3. <2> 中输入Join可以包含任何数量的参数
+                .withOperandSupplier(b0 -> b0.operand(Filter.class)
+                                             .oneInput(b1 -> b1.operand(Join.class)
+                                                               .anyInputs()))
+                // 拷贝到 FilterJoinRule.FilterIntoJoinRule.Config 类型
+                .as(FilterJoinRule.FilterIntoJoinRule.Config.class)
+                // 加强 join-type
+                .withSmart(true)
+                // 设置 predicate，predicate 会检查当前 joinType 在当前 join 上是否合法，如果不合法则推回到连接操作之前
+                // 具体的说明如下所示
+                .withPredicate((join, joinType, exp) -> true)
+                // 拷贝到 FilterJoinRule.FilterIntoJoinRule.Config 类型
+                .as(FilterJoinRule.FilterIntoJoinRule.Config.class);
+
+        @Override
+        default FilterJoinRule.FilterIntoJoinRule toRule() {
+            return new FilterJoinRule.FilterIntoJoinRule(this);
+        }
+    }
+```
+
+> **Predicate that returns whether a filter is valid in the ON clause of a join for this particular kind of join. If not, Calcite will push it back to above the join*
+>
+> 这句话怎么理解呢，我给出了一个简单的例子：
+
+```sql
+SELECT *
+FROM A
+JOIN B ON A.id = B.id
+WHERE B.age > 30
+```
+
+对于上面的查询，`B.age > 30` 是合法的，因为他可以起到减少过滤条件的作用。
+
+```sql
+SELECT *
+FROM A
+INNER JOIN B ON A.id = B.id
+INNER JOIN C ON A.id = C.id
+WHERE C.name = 'hello'
+```
+
+而 c.name='hello' 对于 A.id=B.id 就是不合法的，因为他对join条件的减少没有任何作用。
+
+> 下面是一个实例，输出的结果如下
+>
+> ```
+> LogicalProject(Id=[$0], Name=[$1], Score=[$2])
+>   LogicalFilter(condition=[AND(=(CAST($0):INTEGER NOT NULL, 1), =($1, 'test'))])
+>     LogicalTableScan(table=[[csv, data]])
+> ```
+>
+> 可以看到
+>
+> 1. 我们的 `select *` 被转换了 Id, Name, Score 三个字段；
+> 2. LogicalFilter 是一个条件过滤，并且显示为 `[AND(=(CAST($0):INTEGER NOT NULL, 1), =($1, 'test'))]`；
+
+###### 第一个例子
+
+```sql
+select * from data where id = 1 and name = 'test'
+```
+
+```java
+    @Test
+    public void testGraph() throws SqlParseException {
+        String sql = "select * from data where id = 1 and name = 'test'";
+        HepProgramBuilder builder = HepProgram.builder();
+        HepPlanner planner = new HepPlanner(builder.build());
+        RelNode relNode = SqlToRelNode.getSqlNode(sql, planner);
+        System.out.println(RelOptUtil.toString(relNode));
+    }
+```
+
+> 以上SQL生成的DAG如图所示
+
+```java
+Breadth-first from root:  {
+		// 封装后的节点相当于之前的LogicProject
+  	rel#8:HepRelVertex(rel#7:LogicalProject.(input=HepRelVertex#6,inputs=0..2)) = rel#7:LogicalProject.(input=HepRelVertex#6,inputs=0..2), rowcount=2.25, cumulative cost=104.5
+    rel#6:HepRelVertex(rel#5:LogicalFilter.(input=HepRelVertex#4,condition=AND(=(CAST($0):INTEGER NOT NULL, 1), =($1, 'test')))) = rel#5:LogicalFilter.(input=HepRelVertex#4,condition=AND(=(CAST($0):INTEGER NOT NULL, 1), =($1, 'test'))), rowcount=2.25, cumulative cost=102.25
+    rel#4:HepRelVertex(rel#1:LogicalTableScan.(table=[csv, data])) = rel#1:LogicalTableScan.(table=[csv, data]), rowcount=100.0, cumulative cost=100.0
+}
+```
+
+###### 第二个例子
+
+```sql
+SELECT a.Id
+FROM DATA AS a
+JOIN DATA b ON a.Id = b.Id
+WHERE a.Id>1
+```
+
+对于以上SQL，我们可以增加我们上面提到的规则
+
+```java
+        HepProgramBuilder programBuilder = HepProgram.builder();
+        // 增加 FilterIntoJoinRule 规则
+				HepProgram hepProgram = programBuilder.addRuleInstance(FilterJoinRule.FilterIntoJoinRule.Config.DEFAULT.toRule())
+                                           .build();
+        HepPlanner hepPlanner = new HepPlanner(hepProgram);
+```
+
+优化前执行计划
+
+```java
+LogicalProject(ID=[$0])
+  // 逻辑过滤 a.Id > 1
+  LogicalFilter(condition=[>(CAST($0):INTEGER NOT NULL, 1)])
+  	// JOIN DATA b ON a.Id = b.Id
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalTableScan(table=[[csv, data]])
+      LogicalTableScan(table=[[csv, data]])
+```
+
+```mermaid
+flowchart LR
+	LogicalProject --> LogicalFilter --> LogicalJoin
+	LogicalJoin --> LogicalTableScanA
+	LogicalJoin --> LogicalTableScanB
+```
+
+
+
+优化后执行计划
+
+```java
+LogicalProject(ID=[$0])
+  LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+    LogicalFilter(condition=[>(CAST($0):INTEGER NOT NULL, 1)])
+      LogicalTableScan(table=[[csv, data]])
+    LogicalTableScan(table=[[csv, data]])
+```
+
+```mermaid
+flowchart LR
+	LogicalProject --> LogicalJoin --> LogicalFilter --> LogicalTableScanA
+	LogicalJoin --> LogicalTableScanB
+```
+
+那由于条件 a.Id = b.Id，并且 a.Id > 1，我们可以推断出来一个更新的条件 b.Id > 1，如此我们可以生成一个更快的执行计划
+
+```mermaid
+flowchart LR
+	LogicalProject --> LogicalJoin --> LogicalFilterA --> LogicalTableScanA
+	LogicalJoin --> LogicalFilterB --> LogicalTableScanB
+```
+
+##### VolcanoPlanner
+
+> VolcanoPlanner 用于 CBO，默认提供了数据行数，CPU代价，I/O代价，用户也可以自行添加指标。
+
+###### call convention
+
+在我们进行CBO的时候，有一个非常重要的概念叫 `call convention`，一般来说他约定了参数传递方式，寄存器使用，栈的操作细节。**这是因为CBO是语言、平台相关的，**否则是无法保证我们正确的评估和比较不同执行计划的代价。
+
+###### RelSet
+
+>A RelSet is an equivalence-set of expressions; that is, a set of expressions which have identical semantics. We are generally interested in using the expression which has the lowest cost.
+>All of the expressions in an RelSet have the same calling convention.
+
+```java
+class RelSet {
+  final List<RelNode> rels = new ArrayList<>();
+  /**
+   * Relational expressions that have a subset in this set as a child. This
+   * is a multi-set. If multiple relational expressions in this set have the
+   * same parent, there will be multiple entries.
+   */
+  final List<RelNode> parents = new ArrayList<>();
+  final List<RelSubset> subsets = new ArrayList<>();
+}
+```
+
+###### RelSubset
+
+>Subset of an equivalence class where all relational expressions have the same physical properties.
+>Physical properties are instances of the RelTraitSet, and consist of traits such as calling convention and collation (sort-order).
+>For some traits, a relational expression can have more than one instance. For example, R can be sorted on both [X] and [Y, Z]. In which case, R would belong to the sub-sets for [X] and [Y, Z]; and also the leading edges [Y] and [].
+
+###### VolcanoPlanner
+
+```java
+  public void setRoot(RelNode rel) {
+    // We've registered all the rules, and therefore RelNode classes,
+    // we're interested in, and have not yet started calling metadata providers.
+    // So now is a good time to tell the metadata layer what to expect.
+    registerMetadataRels();
+
+    this.root = registerImpl(rel, null);
+    if (this.originalRoot == null) {
+      this.originalRoot = rel;
+    }
+
+    rootConvention = this.root.getConvention();
+    ensureRootConverters();
+  }
+
+```
+
+###### registerImpl()
+
+```java
+  /**
+   * Registers a new expression <code>exp</code> and queues up rule matches.
+   * If <code>set</code> is not null, makes the expression part of that
+   * equivalence set. If an identical expression is already registered, we
+   * don't need to register this one and nor should we queue up rule matches.
+   *
+   * @param rel relational expression to register. Must be either a
+   *         {@link RelSubset}, or an unregistered {@link RelNode}
+   * @param set set that rel belongs to, or <code>null</code>
+   * @return the equivalence-set
+   */
+  private RelSubset registerImpl(
+      RelNode rel,
+      RelSet set) {
+    	//...
+      RelSubset subset = addRelToSet(rel, set);
+    	// ..
+  }
+```
+
+### 8.4 自定义优化规则
+
+> 对于自定义的优化规则，只需要规定好**需要匹配的节点**和**目标转换方式**即可，并加入到规则中。
+
+#### 8.4.1 CSVRule
+
+##### 1. 创建CSVPRroject
+
+```java
+public class CSVProject extends Project {
+
+    public CSVProject(RelOptCluster cluster, RelTraitSet traits, RelNode input, List<? extends RexNode> projects, RelDataType rowType) {
+        super(cluster,traits, ImmutableList.of(),input,projects,rowType);
+    }
+
+    // 复制 project
+    @Override
+    public Project copy(RelTraitSet traitSet, RelNode input, List<RexNode> projects, RelDataType rowType) {
+        return new CSVProject(getCluster(),traitSet,input,projects,rowType);
+    }
+
+    // 为了让该优化被应用，我们将cost设置为0
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        return planner.getCostFactory().makeZeroCost();
+    }
+}
+
+```
+
+##### 2. 制定匹配规则
+
+```java
+public class CSVProjectRule  extends RelRule<CSVProjectRule.Config> {
+
+    // if RelNode match rule, then enter onMatch and covert LogicalProject to
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+        final LogicalProject project = call.rel(0);
+        final CSVProject converted = convert(project);
+        if (converted != null) {
+            call.transformTo(converted);
+        }
+    }
+
+    /** Rule configuration. */
+    public interface Config extends RelRule.Config {
+        // set match rule : root is a LogicalProject
+        Config DEFAULT = EMPTY
+                .withOperandSupplier(b0 ->
+                        b0.operand(LogicalProject.class).anyInputs())
+                .as(Config.class);
+
+        @Override default CSVProjectRule toRule() {
+            return new CSVProjectRule(this);
+        }
+    }
+
+    private CSVProjectRule(Config config) {
+        super(config);
+    }
+
+
+    /**
+     * convert LogicalProject to CSVProject
+     */
+    public CSVProject convert(RelNode rel) {
+        final LogicalProject project = (LogicalProject) rel;
+        final RelTraitSet traitSet = project.getTraitSet();
+        return new CSVProject(project.getCluster(), traitSet,
+                              project.getInput(), project.getProjects(),
+                              project.getRowType());
+    }
+}
+```
+
+##### 3.应用规则
+
+```java
+    public void testCustomRule() throws SqlParseException {
+        final String sql = "select Id from data ";
+        // create builder to build hep program
+        HepProgramBuilder programBuilder = HepProgram.builder();
+        // add rule and rule with cost
+        HepProgram program = programBuilder.addRuleInstance(CSVProjectRule.Config.DEFAULT.toRule())
+                                           .addRuleInstance(CSVProjectRuleWithCost.Config.DEFAULT.toRule())
+                                           .build();
+        // create planner
+        HepPlanner hepPlanner = new HepPlanner(program);
+        RelNode    relNode    = SqlToRelNode.getSqlNode(sql, hepPlanner);
+        //未优化算子树结构
+        System.out.println(RelOptUtil.toString(relNode));
+
+        // planner should set root and call findBestExp() to get optimized RelNode
+        RelOptPlanner planner = relNode.getCluster().getPlanner();
+        planner.setRoot(relNode);
+        RelNode bestExp = planner.findBestExp();
+        //优化后接结果
+        System.out.println("===========RBO优化结果============");
+        System.out.println(RelOptUtil.toString(bestExp));
+
+        // planner should set root and call findBestExp() to get optimized RelNode
+        RelOptPlanner relOptPlanner = relNode.getCluster().getPlanner();
+        relOptPlanner.addRule(CSVProjectRule.Config.DEFAULT.toRule());
+        relOptPlanner.addRule(CSVProjectRuleWithCost.Config.DEFAULT.toRule());
+        relOptPlanner.setRoot(relNode);
+        RelNode exp = relOptPlanner.findBestExp();
+        System.out.println("===========CBO优化结果============");
+        System.out.println(RelOptUtil.toString(exp));
+
+
+    }
+```
+
+#### 8.4.2 RBO vs. CBO
+
+> 可以看到，`HepPlanner` 只是简单的遍历规则然后匹配，并没有考虑任何其他信息。而 `VolcanoPlanner` 会考虑到了算子的 cost。
+
+```java
+    public void testRBOAndCBO() throws SqlParseException {
+        final String      sql        = "select * from data ";
+
+        ArrayList<RelRule.Config> ruleConfigs = new ArrayList<>();
+        ruleConfigs.add(CSVProjectRule.Config.DEFAULT);
+        ruleConfigs.add(CSVProjectRuleWithCost.Config.DEFAULT);
+        RelNode sqlNode = SqlToRelNode.findUnoptimizedExp(sql, ruleConfigs);
+        // output project before optimize
+        System.out.println(RelOptUtil.toString(sqlNode));
+        // LogicalProject(Id=[$0], Name=[$1], Score=[$2])
+        //  LogicalTableScan(table=[[csv, data]])
+
+        RelNode bestExp = SqlToRelNode.findHepBestExp(sqlNode, ruleConfigs);
+        System.out.println(RelOptUtil.toString(bestExp));
+        // CSVProject(Id=[$0], Name=[$1], Score=[$2])
+        //  LogicalTableScan(table=[[csv, data]])
+
+        ruleConfigs.clear();
+        ruleConfigs.add(CSVProjectRuleWithCost.Config.DEFAULT);
+        ruleConfigs.add(CSVProjectRule.Config.DEFAULT);
+        bestExp = SqlToRelNode.findHepBestExp(sqlNode, ruleConfigs);
+        System.out.println(RelOptUtil.toString(bestExp));
+        // CSVProjectWithCost(Id=[$0], Name=[$1], Score=[$2])
+        //  LogicalTableScan(table=[[csv, data]])
+
+        RelNode bestVolcanoExp = SqlToRelNode.findVolcanoBestExp(sqlNode, ruleConfigs);
+        System.out.println(RelOptUtil.toString(bestVolcanoExp));
+    }
+
+```
+
+
 
 
 
