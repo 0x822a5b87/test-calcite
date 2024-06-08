@@ -19,11 +19,13 @@ public class CSVProject extends Project {
         super(cluster,traits, ImmutableList.of(),input,projects,rowType);
     }
 
+    // 复制 project
     @Override
     public Project copy(RelTraitSet traitSet, RelNode input, List<RexNode> projects, RelDataType rowType) {
         return new CSVProject(getCluster(),traitSet,input,projects,rowType);
     }
 
+    // 为了让该优化被应用，我们将cost设置为0
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         return planner.getCostFactory().makeZeroCost();
