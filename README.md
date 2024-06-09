@@ -1898,6 +1898,45 @@ public class CSVProjectRule  extends RelRule<CSVProjectRule.Config> {
 
 ```
 
+## 第9章 - 数据源接入
+
+### 9.1 Redis
+
+> Redis 的接入，粗略来说可以分为以下几个部分：
+>
+> 1. 基于 `model.json` 配置 `schema` 信息，指定库名，表名，表字段，以及重要的 `SchemaFactory` 和 `TableFactory` 这些 calcite 初始化数据源数据结构的信息；
+> 2. 实现 `model.json` 中声明的 `SchemaFactory` 以初始化 `Schame`；
+> 3. 实现 `model.json` 中声明的 `TableFactory` 以初始化 `Table`；
+> 4. 实现 `Table` 用于表示redis的实际数据，以及实现 `ScannableTable` 用于支持 `select` 语句。
+> 5. 其余的类都是用于解析redis中的实际数据结构。
+>
+> 整体的实现如下所示：
+>
+> 1. `model.json` 用于 calcite 初始化；
+> 2. `RedisSchemaFactory` 和 `RedisSchema` 用于初始化 schema 信息；
+> 3. `RedisTableFactory` 和 `RedisTable` 用于初始化 table 信息；
+> 4. `RedisEnumeration` 用于实现 `select` 功能，所以在这里他需要去连接、访问、解析redis数据；
+>    1. `RedisConfig` 连接 redis 的信息；
+>    2. `RedisJedisManager` 用于访问 redis；
+>    3. `RedisTableFieldInfo` 用于存储redis值的元数据信息，例如 tableName，表字段信息；
+>    4. `RedisDataType` redis 存储的几种数据类型，例如 string, hash；
+>    5. `RedisDataFormat` redis value 值类型，例如 raw，json，csv；
+>    6. `RedisDataProcess` 根据redis相关的信息，在 `RedisEnumeration` 中解析redis的实际数据并返回。
+
+```mermaid
+flowchart LR
+	RedisAdapter -->|init factory and schema| model[model.json]
+	RedisAdapter -->|init schema| RedisSchemaFactory --> RedisSchema
+	RedisAdapter -->|init table| RedisTableFactory -->|data source| RedisTable
+	RedisAdapter -->|init data source| RedisEnumeration
+	RedisEnumeration -->|config| RedisConfig
+  RedisEnumeration -->|connection| RedisJedisManager
+  RedisEnumeration -->|value config| RedisTableFieldInfo
+  RedisEnumeration -->|key type| RedisDataType
+  RedisEnumeration -->|value type| RedisDataFormat
+  RedisEnumeration -->|value process| RedisDataProcess
+```
+
 
 
 

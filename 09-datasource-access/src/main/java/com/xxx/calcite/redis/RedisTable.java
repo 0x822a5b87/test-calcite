@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.com.ptpress.cdm.ds.redis;
+package com.xxx.calcite.redis;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.DataContext;
@@ -24,10 +24,7 @@ import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelProtoDataType;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.schema.ProjectableFilterableTable;
 import org.apache.calcite.schema.ScannableTable;
-import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.calcite.util.Pair;
 import org.checkerframework.checker.nullness.qual.Nullable;

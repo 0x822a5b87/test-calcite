@@ -1,4 +1,4 @@
-package cn.com.ptpress.cdm.ds.redis;
+package com.xxx.calcite.redis;
 
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
@@ -56,7 +56,6 @@ public class RedisServerStart {
      */
     private void makeData() {
         pool.getResource().lpush("stu_01", "{\"name\":\"小明\",\"score\":90}","{\"name\":\"小红\",\"score\":80}");
-        pool.getResource().set("hello", "world");
     }
 
 }

@@ -1,1 +1,1 @@
-package cn.com.ptpress.cdm.ds.redis;
+package com.xxx.calcite.redis;

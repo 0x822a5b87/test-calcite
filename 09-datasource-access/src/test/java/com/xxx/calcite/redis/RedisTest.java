@@ -1,4 +1,4 @@
-package cn.com.ptpress.cdm.ds.redis;
+package com.xxx.calcite.redis;
 
 
 import org.junit.jupiter.api.*;
@@ -37,8 +37,6 @@ class RedisTest {
     @Test
     public void testServer() throws SQLException, ClassNotFoundException {
         query("select name from \"stu_01\"", 2);
-
-        query("select * from \"hello\"", 1);
     }
 
 

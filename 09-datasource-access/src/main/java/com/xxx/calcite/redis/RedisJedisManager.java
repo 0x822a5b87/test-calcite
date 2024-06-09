@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.com.ptpress.cdm.ds.redis;
+package com.xxx.calcite.redis;
 
 import com.google.common.cache.*;
 import org.apache.calcite.util.trace.CalciteTrace;
