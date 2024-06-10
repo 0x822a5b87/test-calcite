@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "defaultSchema": "redis",
+  "schemas": [
+    {
+      "type": "custom",
+      "name": "redis",
+      "factory": "com.xxx.calcite.redis.RedisSchemaFactory",
+      "operand": {
+        "host": "127.0.0.1",
+        "port": 6379,
+        "database": 0,
+        "password": ""
+      },
+      "tables": [
+        {
+          "name": "stu_01",
+          "factory": "com.xxx.calcite.redis.RedisTableFactory",
+          "operand": {
+            "dataFormat": "json",
+            "fields": [
+              {
+                "name": "NAME",
+                "type": "varchar",
+                "mapping": "NAME"
+              },
+              {
+                "name": "score",
+                "type": "integer",
+                "mapping": "score"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
