@@ -2273,6 +2273,14 @@ public class StreamLogCacheTable extends StreamLogTable {
 
 ```
 
+## 第13章 视图
+
+```mermaid
+flowchart LR
+	view --> 普通视图
+	view --> 物化视图
+```
+
 
 
 

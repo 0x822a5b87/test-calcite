@@ -32,6 +32,7 @@
         <module>09-datasource-access</module>
         <module>10-sql-extension</module>
         <module>12-stream</module>
+        <module>13-view</module>
         <module>common-csv-access</module>
         <module>javacc</module>
     </modules>
