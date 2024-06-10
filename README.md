@@ -2167,6 +2167,112 @@ GROUP BY
 	level
 ```
 
+#### StreamLogTable
+
+```java
+public class StreamLogTable implements ScannableTable, StreamableTable {
+
+    public final static String[] LEVELS = new String[]{
+            "TRACE",
+            "DEBUG",
+            "INFO",
+            "WARN",
+            "ERROR"
+    };
+
+    @Override
+    public Enumerable<Object[]> scan(DataContext root) {
+        return Linq4j.asEnumerable(() -> new Iterator<Object[]>() {
+
+            private final Random r = new Random();
+
+            @Override
+            public boolean hasNext() {
+                return true;
+            }
+
+            @SneakyThrows
+            @Override
+            public Object[] next() {
+                TimeUnit.MICROSECONDS.sleep(r.nextInt(100));
+                String level     = LEVELS[r.nextInt(LEVELS.length)];
+                long   timestamp = System.currentTimeMillis();
+                return new Object[]{timestamp, level, String.format("This is a %s msg on %d", level, timestamp)};
+            }
+        });
+    }
+
+    @Override
+    public Table stream() {
+        return this;
+    }
+
+    @Override
+    public RelDataType getRowType(RelDataTypeFactory typeFactory) {
+        return typeFactory.builder()
+                          .add("LOG_TIME", SqlTypeName.TIMESTAMP)
+                          .add("LEVEL", SqlTypeName.VARCHAR)
+                          .add("MSG", SqlTypeName.VARCHAR)
+                          .build();
+    }
+
+    @Override
+    public Statistic getStatistic() {
+        return Statistics.of(100d, new ArrayList<>(1), RelCollations.createSingleton(0));
+    }
+
+    @Override
+    public Schema.TableType getJdbcTableType() {
+        return Schema.TableType.STREAM;
+    }
+
+    @Override
+    public boolean isRolledUp(String column) {
+        return false;
+    }
+
+    @Override
+    public boolean rolledUpColumnValidInsideAgg(String column, SqlCall call, SqlNode parent,
+                                                CalciteConnectionConfig config) {
+        return false;
+    }
+}
+
+```
+
+#### StreamLogCacheTable
+
+```java
+public class StreamLogCacheTable extends StreamLogTable {
+
+    private final List<Object[]> cache = new ArrayList<>();
+
+    public StreamLogCacheTable() {
+        new Thread(() -> {
+            try {
+                Random r = new Random();
+                while (true) {
+                    TimeUnit.MICROSECONDS.sleep(r.nextInt(100));
+                    long timestamp = System.currentTimeMillis();
+                    String level = LEVELS[r.nextInt(LEVELS.length)];
+                    Object[] o = {timestamp, level, String.format("This is a %s msg on %d", level, timestamp)};
+                    cache.add(o);
+                }
+            } catch (Exception e) {
+
+            }
+        }).start();
+    }
+
+    @Override
+    public Enumerable<Object[]> scan(DataContext root) {
+        // 每次调用返回一定数量的随机数据，否则SQL会被阻塞在scan线程内
+        return Linq4j.asEnumerable(cache);
+    }
+}
+
+```
+
 
 
 
