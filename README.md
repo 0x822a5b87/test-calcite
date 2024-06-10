@@ -2145,3 +2145,43 @@ public class Explode {
 
 9. `SqlStdOperatorTable` containing the standard operators and functions. contains default operators and functions.
 
+## 第12章-流式处理
+
+传统的数据基于静态的数据集，而流式数据也是数据的集合，只是这些数据持续的流动。
+
+### 12.2 流式查询初体验
+
+> 我们定义一个场景：不断的接受系统日志的日志处理。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

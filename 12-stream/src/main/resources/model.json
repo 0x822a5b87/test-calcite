@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "defaultSchema": "STREAM",
+  "schemas": [
+    {
+      "name": "STREAM",
+      "tables": [
+        {
+          "type": "custom",
+          "name": "LOG",
+          "stream": {
+            "stream": true
+          },
+          "factory": "com.xxx.calcite.stream.StreamLogTableFactory"
+        }
+      ]
+    }
+  ]
+}
