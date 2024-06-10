@@ -2153,6 +2153,20 @@ public class Explode {
 
 > 我们定义一个场景：不断的接受系统日志的日志处理。
 
+### 12.3 流式聚合查询
+
+```sql
+SELECT
+	STREAM FLOOR(log_time TO MINUTE) AS log_time,
+	level,
+	count(*) AS c
+FROM
+	LOG
+GROUP BY
+	FLOOR(log_time TO MINUTE),
+	level
+```
+
 
 
 

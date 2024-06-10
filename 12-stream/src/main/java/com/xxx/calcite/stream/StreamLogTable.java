@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 public class StreamLogTable implements ScannableTable, StreamableTable {
 
-    private final static String[] LEVELS = new String[]{
+    public final static String[] LEVELS = new String[]{
             "TRACE",
             "DEBUG",
             "INFO",

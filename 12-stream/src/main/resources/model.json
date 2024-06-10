@@ -12,6 +12,14 @@
             "stream": true
           },
           "factory": "com.xxx.calcite.stream.StreamLogTableFactory"
+        },
+        {
+          "type": "custom",
+          "name": "LOG_CACHE",
+          "stream": {
+            "stream": true
+          },
+          "factory": "com.xxx.calcite.stream.StreamLogTableCacheFactory"
         }
       ]
     }
