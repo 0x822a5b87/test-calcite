@@ -16,7 +16,7 @@
 
 ```mermaid
 flowchart LR
-	
+
 	SQL -->|文本| parserGraph
 	parserGraph -->|"AST(SqlNode)"| logicalQueryPlanGraph
 	logicalQueryPlanGraph -->|logical query plan| queryOptimizeGraph
@@ -25,15 +25,15 @@ flowchart LR
 	subgraph parserGraph
 		parser.jj -->|text| lexer[lexer/tokenizer] -->|tokens| parser
 	end
-	
+
 	subgraph logicalQueryPlanGraph[逻辑查询计划]
-		HepPlanner -->|RBO| RBO-LogicalQueryPlan 
+		HepPlanner -->|RBO| RBO-LogicalQueryPlan
 	end
-	
+
 	subgraph queryOptimizeGraph[查询优化]
 		VolcanoPlanner -->|CBO| CBO-LogicalQueryPlan
 	end
-	
+
 	subgraph physicalPlanGraph
 		PhysicalPlanner
 	end
@@ -46,17 +46,17 @@ flowchart TD
 	calcite --> parser
 	calcite --> logicalPlan
 	calcite --> physicalPlan
-	
+
 	parser --> SqlNode
 	parser --> SqlAlter
 	parser --> SqlCall
 	parser --> Sql[...]
-	
+
 	logicalPlan --> RelNode
 	logicalPlan --> LogicalProject
 	logicalPlan --> LogicalTableScan
 	logicalPlan --> Logical[...]
-	
+
 	physicalPlan --> PhysicalNode
 	physicalPlan --> JdbcProject
 	physicalPlan --> JdbcTableScan
@@ -235,7 +235,7 @@ cd calcite/example/csv
 > 1. `"name": "SALES"` 定义了schema的名字；
 > 2. `"type:"custom` 指定schema类型为用户自定义；
 > 3. `"factory"` 指定数据模型工厂；
-> 4. `operand.directory` 指定了文件的位置； 
+> 4. `operand.directory` 指定了文件的位置；
 
 ```json
 {
@@ -405,7 +405,7 @@ flowchart TD
 		查询优化层
 		数据统计模块
 	end
-	
+
 	subgraph physicalLayer
 		物理执行层
 	end
@@ -420,20 +420,20 @@ flowchart TD
 ```mermaid
 flowchart LR
 	关系模型
-	
+
 	关系模型 --> 关系数据结构
 	关系模型 --> 关系运算集合
 	关系模型 --> 关系完整性约束
-	
+
 	关系数据结构 --> 表 --> 行1[行1/行2/...] --> 字段[字段1/字段2/...]
-	
+
 	元数据管理:::important ---->|约束| 字段
-	
+
 	关系运算集合 --> 集合运算符
 	关系运算集合 --> 专门的关系运算符
 	关系运算集合 --> 比较运算符
 	关系运算集合 --> 逻辑运算符
-	
+
 	关系完整性约束 --> 实体完整性["实体完整性（主键/NOT NULL）"]
 	关系完整性约束 --> 参照完整性["参照完整性（外键）"]
 	关系完整性约束 --> 域完整性["域完整性（枚举）"]
@@ -516,7 +516,7 @@ ON
 > 	CPU <--> 一级缓存  <--> 二级缓存 <--> 三级缓存 <--> 内存 <--> 硬盘
 > ```
 >
-> 
+>
 
 相比与逻辑计划优化，物理计划更贴近于计算机的物理层面。距离来说，当我们做逻辑优化的时候，我们不需要考虑计算运行于intel还是amd的CPU，也不需要考虑硬盘使用的是SSD还是普通的机械硬盘诸如此类的问题。
 
@@ -540,9 +540,9 @@ cost() = page_num * cpu_time_per_page + cpu_cost
 >
 > ```mermaid
 > flowchart LR
-> 
->  machine1 <-->|网络通信| machine2 <-->|网络通信| machine3
-> 
+>
+> machine1 <-->|网络通信| machine2 <-->|网络通信| machine3
+>
 > 	subgraph machine1
 > 		direction LR
 > 		CPU1[cpu]
@@ -561,10 +561,10 @@ cost() = page_num * cpu_time_per_page + cpu_cost
 > 		memory3[memory]
 > 		disk3[disk]
 > 	end
-> 	
+>
 > ```
 >
-> 
+>
 
 
 
@@ -592,7 +592,7 @@ flowchart LR
 火山模型是将整个关系代数中的每一个操作都抽象为一个运算符，将整个SQL的逻辑结构抽象为一个运算符树。**查询操作由根节点发起，通过next接口一步一步向查询引擎发送。数据被自下而上逐级拉起，如同火山喷发因此命名为火山模型。**
 
 ```sql
-SELECT 
+SELECT
 	id,
 	name,
 	age
@@ -640,13 +640,13 @@ flowchart LR
 		Avatica驱动SPI:::important
 		AvaticaRPC服务端[Avatica RPC服务端]
 	end
-	
+
 	subgraph Calcite
 		direction LR
 		calcite-core
 		CalciteJDBC[Caclite JDBC 驱动]
 	end
-	
+
 	subgraph Avatica客户端
 		direction LR
 		Java客户端
@@ -677,12 +677,12 @@ flowchart LR
 flowchart LR
 	AvaticaServer --> Service["org.apache.calcite.avatica.remote.Service"]
 	AvaticaServer --> Meta["org.apache.calcite.avatica.Meta"]
-	
+
 	Service --> 元数据接口
 	Service --> 执行查询请求和获取结果请求
 	Service --> 事务请求
 	Service --> otherService[...]
-	
+
 	Meta --> openConnection
 	Meta --> createStatement
 	Meta --> execute
@@ -718,7 +718,7 @@ flowchart TD
 		查询优化层
 		数据统计模块
 	end
-	
+
 	subgraph physicalLayer
 		物理执行层
 	end
@@ -767,13 +767,13 @@ classDiagram
 		+SqlKind getKind()
 		+boolean isA(Set<SqlKind>)
 	}
-	
+
 	class SqlLiteral {
 		SqlTypeName typeName
 		Object value
 	}
 	Cloneable <|-- SqlNode
-	
+
 	SqlNode <|-- SqlLiteral
 	SqlNode <|-- SqlIdentifier
 	SqlNode <|-- SqlCall
@@ -817,7 +817,7 @@ flowchart TB
 		direction LR
 		SELECT --> selectList:::important
 	end
-	
+
 	subgraph fromStatement
 		FROM --> from["from"]:::important
 		from --> WHERE --> where["where"]:::important
@@ -833,7 +833,7 @@ flowchart TB
 	subgraph orderByStatement
 		ORDERBY["ORDER BY"] --> orderBy:::important --> offset:::important --> dot[","] --> fetch:::important
 	end
-	
+
 
 classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
 ```
@@ -934,17 +934,17 @@ flowchart TB
 	SqlSelect --> selectList:::important
 	SqlSelect --> from:::important
 	SqlSelect --> where:::important
-	
+
 	selectList --> SqlNodeList
 	SqlNodeList --> SqlIdentifier --> selectNodeIdentifier["id"]:::important
-	
+
 	from --> FromSqlNode["SqlNode"] --> FromSqlIdentifier["SqlIdentifier"] --> FromStatement["t"]:::important
-	
+
 	where --> SqlBasicCall["SqlBasicCall"]
 	SqlBasicCall -..->|内部持有| SqlBinaryOperator --> GreaterThan
 	GreaterThan --> LeftSqlIdentifier --> Left["id"]:::important
 	GreaterThan --> RightSqlIdentifier --> Right["1"]:::important
-	
+
 classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
 ```
 
@@ -1054,24 +1054,24 @@ flowchart LR
 	calcite --> Model1
 	calcite --> Model2
 	calcite --> Model3[...]
-	
+
 	Model1 --> Schema1
 	Model1 --> Schema2
 	Model1 --> Schema3[...]
-	
+
 	Model2 --> Schema4
 	Model2 --> Schama5
 	Model2 --> Schame6[...]
-	
+
 	Schema1 --> Table1
 	Schema1 --> Table2[...]
-	
+
 	Schema2 --> Table3
 	Schema2 --> Table4[...]
 
 	Schema4 --> Table5
 	Schema4 --> Table6[...]
-	
+
   Schama5 --> Table7
 	Schama5 --> Table8[...]
 ```
@@ -1082,10 +1082,10 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-	Calcite --> 关系模型 -->|拉取| 内存 
+	Calcite --> 关系模型 -->|拉取| 内存
 	Calcite --> KV模型 -->|拉取| 内存
 	Calcite --> 文档模型 -->|拉取| 内存
-	
+
 	内存 --> 统一关系模型
 ```
 
@@ -1097,7 +1097,7 @@ flowchart LR
 
 > Schema : `a persistent, named collection of descriptor`。
 >
-> 
+>
 >
 > 包含了表、列、数据类型、视图、存储过程、关系、主键、外键等概念。
 
@@ -1112,7 +1112,7 @@ flowchart LR
 	Calcite --> JSON/YAML --> Map["Map(默认)"]:::important
 	JSON/YAML --> JDBC
 	JSON/YAML --> CUSTOM
-	
+
 classDef important fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
 ```
 
@@ -1198,26 +1198,26 @@ flowchart LR
 >
 >```json
 >{
->    "version": "1.0",
->    "defaultSchema": "SALES",
->    "schemas": [
->        {
->            "name": "SALES",
->            "type": "custom",
->            "factory": "org.apache.calcite.adapter.csv.CsvSchemaFactory",
->            "mutable": true,
->            "operand": {
->                "directory": "sales"
->            },
->            "tables": [
->                {
->                    "name": "FEMALE_EMPS",
->                    "type": "view",
->                    "sql": "SELECT * FROM emps WHERE gender = 'F'"
->                }
->            ]
->        }
->    ]
+>"version": "1.0",
+>"defaultSchema": "SALES",
+>"schemas": [
+>   {
+>       "name": "SALES",
+>       "type": "custom",
+>       "factory": "org.apache.calcite.adapter.csv.CsvSchemaFactory",
+>       "mutable": true,
+>       "operand": {
+>           "directory": "sales"
+>       },
+>       "tables": [
+>           {
+>               "name": "FEMALE_EMPS",
+>               "type": "view",
+>               "sql": "SELECT * FROM emps WHERE gender = 'F'"
+>           }
+>       ]
+>   }
+>]
 >}
 >```
 >
@@ -1251,7 +1251,7 @@ public interface SchemaFactory {
 flowchart TD
 
 	`model.json` -->|config| SchemaFactory
-	
+
 	subgraph SchemaGraph[Schema]
 		SchemaFactory -->|create| Schema
 	end
@@ -1276,9 +1276,9 @@ flowchart TD
 			ColumnType3[...]
 		end
 	end
-	
+
 	TableGraph --> columnsGraph
-	
+
 	Schema -->|getTableMap| MyTable
 ```
 
@@ -1341,7 +1341,7 @@ flowchart LR
 	subgraph input
 		Filter0[Filter] --> Join0[Join]
 	end
-	
+
 	subgraph output
 		Join1[Join] --> Filter1[Filter]
 	end
@@ -1572,8 +1572,8 @@ WHERE C.name = 'hello'
 >
 > ```
 > LogicalProject(Id=[$0], Name=[$1], Score=[$2])
->   LogicalFilter(condition=[AND(=(CAST($0):INTEGER NOT NULL, 1), =($1, 'test'))])
->     LogicalTableScan(table=[[csv, data]])
+> LogicalFilter(condition=[AND(=(CAST($0):INTEGER NOT NULL, 1), =($1, 'test'))])
+>  LogicalTableScan(table=[[csv, data]])
 > ```
 >
 > 可以看到
@@ -1937,57 +1937,456 @@ flowchart LR
   RedisEnumeration -->|value process| RedisDataProcess
 ```
 
+## 第10章-SQL函数扩展
+
+### 10.1 UDF介绍
+
+```mermaid
+flowchart LR
+	calcite -->|UDF| java函数 --> 重载
+	java函数 --> calcite注解
+	calcite --> 注册UDF
+	注册UDF --> 修改schema
+	注册UDF --> model.json["model.json(deprecated)"]:::deprecated
+	注册UDF --> createFunctionSql
+
+classDef deprecated fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
 
 
+=======
+## 第10章-SQL函数扩展
+
+### 10.1 UDF介绍
+
+```mermaid
+flowchart LR
+	calcite -->|UDF| java函数 --> 重载
+	java函数 --> calcite注解
+	calcite --> 注册UDF
+	注册UDF --> 修改schema
+	注册UDF --> model.json["model.json(deprecated)"]:::deprecated
+	注册UDF --> createFunctionSql
+
+classDef deprecated fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
 
 
+>>>>>>> Stashed changes
+
+UDF的定义在calcite中就是一个普通函数，我们可以通过 `函数重载` 或者 `calcite注解` 的方式来提供一个UDF的多种不同实现。
+
+```java
+public class UDF {
+
+    public static String mySubString2(
+            @Parameter(name = "S") String s,
+            @Parameter(name = "B") Integer beginIndex,
+            @Parameter(name = "E") Integer endIndex) {
+
+        if (endIndex == null) {
+            endIndex = s.length();
+        }
+
+        return s.substring(beginIndex, endIndex);
+    }
+}
+```
+
+> 修改schema
+
+```java
+public class CsvSchemaFactory implements SchemaFactory {
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+        parentSchema.add("MY_SUB_STRING2", ScalarFunctionImpl.create(UDF.class, "mySubString2"));
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+}
+```
+
+> lookup
+
+```java
+public class CsvSchemaFactory implements SchemaFactory {
+
+    public static final Method SUB_STRING =
+            Types.lookupMethod(UDF.class, "mySubString2", String.class, Integer.class, Integer.class);
+
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+        final ScalarFunction table = ScalarFunctionImpl.create(SUB_STRING);
+        parentSchema.add("MY_SUB_STRING2", table);
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+}
+```
+
+### 10.2 UDAF
+
+> UDAF stands for `User Defined Aggregation Function`.
+
+```java
+    @Test
+    public void testAddUdaf() throws SQLException {
+        Connection connection = getConnection("model.json");
+        Statement  st         = connection.createStatement();
+        ResultSet  resultSet  = st.executeQuery("SELECT COLLECT_LIST(\"Name\") from CSV.\"data\"");
+        while (resultSet.next()) {
+            String name = resultSet.getString(1);
+            System.out.println(name);
+        }
+    }
+```
+
+```java
+public class CsvSchemaFactory implements SchemaFactory {
+
+    public static final Method SUB_STRING =
+            Types.lookupMethod(UDF.class, "mySubString2", String.class, Integer.class, Integer.class);
+
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+        final ScalarFunction table = ScalarFunctionImpl.create(SUB_STRING);
+        parentSchema.add("MY_SUB_STRING2", table);
+
+        parentSchema.add("COLLECT_LIST", AggregateFunctionImpl.create(CollectList.class));
+
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+}
+```
+
+### 10.3 UDTF
+
+> UDTF stands for `User Defined Table Function`.
+
+UDTF 接收输入并转换为一个表，例如函数 `explode(split(name, ","))` 可以将 Name根据空格切分后生成多行。
+
+```sql
+SELECT
+	explode(split(name, ",")) as name
+FROM
+	CSV;
+```
+
+或者
+
+```sql
+SELECT
+	*
+FROM
+	table(EXPLODE('aa, bb', ",")) as t(C);
+```
+
+**UDTF的对应关系是一对多，在calcite中会将其当做一张表来看待。所以定义UDTF的时候需要返回一张表。**
+
+###### test
+
+```java
+    @Test
+    public void testExplode() throws SQLException {
+        String sql = "SELECT * FROM table ( EXPLODE('hello world', ' ') ) as t(C) WHERE C = 'hello'";
+        Connection connection = getConnection("model.json");
+        Statement  st         = connection.createStatement();
+        ResultSet  resultSet  = st.executeQuery(sql);
+        while (resultSet.next()) {
+            String value = resultSet.getString(1);
+            Assertions.assertEquals("hello", value);
+        }
+    }
+```
+
+###### Register UDTF
+
+```java
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+
+        parentSchema.add("EXPLODE", TableFunctionImpl.create(Explode.UDTF_METHOD));
+
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+```
+
+###### EXPLODE
+
+```java
+public class Explode {
+    public static final Method UDTF_METHOD =
+            Types.lookupMethod(Explode.class, "explode", String.class, String.class);
+
+    public static QueryableTable explode(final String str, final String regex) {
+
+        return new AbstractQueryableTable(String.class) {
+            @Override
+            public RelDataType getRowType(RelDataTypeFactory typeFactory) {
+                return typeFactory.createStructType(Collections.singletonList(typeFactory.createJavaType(String.class)),
+                                                    Collections.singletonList("c"));
+            }
+
+            @Override
+            public <T> Queryable<T> asQueryable(QueryProvider queryProvider,
+                                                SchemaPlus schema, String tableName) {
+
+                BaseQueryable<String> queryable = new BaseQueryable<String>(null, String.class, null) {
+                    @Override
+                    public Enumerator<String> enumerator() {
+                        return new Enumerator<String>() {
+                            int      i   = -1;
+                            String[] res = null;
+
+                            @Override
+                            public String current() {
+                                return res[i];
+                            }
+
+                            @Override
+                            public boolean moveNext() {
+                                if (i == -1) {
+                                    res = str.split(regex);
+                                }
+                                if (i < res.length - 1) {
+                                    i++;
+                                    return true;
+                                } else
+                                    return false;
+                            }
+
+                            public void reset() {
+                                i = -1;
+                            }
+
+                            public void close() {
+                            }
+                        };
+                    }
+                };
+                // noinspection unchecked
+                return (Queryable<T>) queryable;
+            }
+        };
+    }
+}
+```
+
+### 10.4 执行流程
+
+#### 涉及到的类和方法
+
+1. `CalcitePrepareImpl implements CalcitePrepare`
+2. `CalcitePrepareImpl#createSqlValidator` create sql validator
+
+2. `CalcitePrepare` API for a service that prepares statements for execution.
+
+3. `CalcitePrepare#prepareSql`
+
+4. `CalcitePrepare#prepareQueryable`
+
+5. `ReflectiveSqlOperatorTable implement SqlOperatorTable`
+
+6. `SqlOperatorTable` SqlOperatorTable defines a directory interface for enumerating and looking up SQL operators and functions.
+
+7. `ReflectiveSqlOperatorTable#init()`Performs post-constructor initialization of an operator table. It can't be part of the consutructor, because the subclass constructor needs to complete first.
+
+8. `SqlStdOperatorTable` containing the standard operators and functions. contains default operators and functions.
 
 
+>>>>>>> Stashed changes
 
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+        parentSchema.add("MY_SUB_STRING2", ScalarFunctionImpl.create(UDF.class, "mySubString2"));
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+}
+```
 
+> lookup
 
+```java
+public class CsvSchemaFactory implements SchemaFactory {
 
+    public static final Method SUB_STRING =
+            Types.lookupMethod(UDF.class, "mySubString2", String.class, Integer.class, Integer.class);
 
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+        final ScalarFunction table = ScalarFunctionImpl.create(SUB_STRING);
+        parentSchema.add("MY_SUB_STRING2", table);
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+}
+```
 
+### 10.2 UDAF
 
+> UDAF stands for `User Defined Aggregation Function`.
 
+```java
+    @Test
+    public void testAddUdaf() throws SQLException {
+        Connection connection = getConnection("model.json");
+        Statement  st         = connection.createStatement();
+        ResultSet  resultSet  = st.executeQuery("SELECT COLLECT_LIST(\"Name\") from CSV.\"data\"");
+        while (resultSet.next()) {
+            String name = resultSet.getString(1);
+            System.out.println(name);
+        }
+    }
+```
 
+```java
+public class CsvSchemaFactory implements SchemaFactory {
 
+    public static final Method SUB_STRING =
+            Types.lookupMethod(UDF.class, "mySubString2", String.class, Integer.class, Integer.class);
 
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
+        final ScalarFunction table = ScalarFunctionImpl.create(SUB_STRING);
+        parentSchema.add("MY_SUB_STRING2", table);
 
+        parentSchema.add("COLLECT_LIST", AggregateFunctionImpl.create(CollectList.class));
 
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+}
+```
 
+### 10.3 UDTF
 
+> UDTF stands for `User Defined Table Function`.
 
+UDTF 接收输入并转换为一个表，例如函数 `explode(split(name, ","))` 可以将 Name根据空格切分后生成多行。
 
+```sql
+SELECT
+	explode(split(name, ",")) as name
+FROM
+	CSV;
+```
 
+或者
 
+```sql
+SELECT
+	*
+FROM
+	table(EXPLODE('aa, bb', ",")) as t(C);
+```
 
+**UDTF的对应关系是一对多，在calcite中会将其当做一张表来看待。所以定义UDTF的时候需要返回一张表。**
 
+###### test
 
+```java
+    @Test
+    public void testExplode() throws SQLException {
+        String sql = "SELECT * FROM table ( EXPLODE('hello world', ' ') ) as t(C) WHERE C = 'hello'";
+        Connection connection = getConnection("model.json");
+        Statement  st         = connection.createStatement();
+        ResultSet  resultSet  = st.executeQuery(sql);
+        while (resultSet.next()) {
+            String value = resultSet.getString(1);
+            Assertions.assertEquals("hello", value);
+        }
+    }
+```
 
+###### Register UDTF
 
+```java
+    @Override
+    public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
 
+        parentSchema.add("EXPLODE", TableFunctionImpl.create(Explode.UDTF_METHOD));
 
+        return new CsvSchema(operand.get("dataFile").toString());
+    }
+```
 
+###### EXPLODE
 
+```java
+public class Explode {
+    public static final Method UDTF_METHOD =
+            Types.lookupMethod(Explode.class, "explode", String.class, String.class);
 
+    public static QueryableTable explode(final String str, final String regex) {
 
+        return new AbstractQueryableTable(String.class) {
+            @Override
+            public RelDataType getRowType(RelDataTypeFactory typeFactory) {
+                return typeFactory.createStructType(Collections.singletonList(typeFactory.createJavaType(String.class)),
+                                                    Collections.singletonList("c"));
+            }
 
+            @Override
+            public <T> Queryable<T> asQueryable(QueryProvider queryProvider,
+                                                SchemaPlus schema, String tableName) {
 
+                BaseQueryable<String> queryable = new BaseQueryable<String>(null, String.class, null) {
+                    @Override
+                    public Enumerator<String> enumerator() {
+                        return new Enumerator<String>() {
+                            int      i   = -1;
+                            String[] res = null;
 
+                            @Override
+                            public String current() {
+                                return res[i];
+                            }
 
+                            @Override
+                            public boolean moveNext() {
+                                if (i == -1) {
+                                    res = str.split(regex);
+                                }
+                                if (i < res.length - 1) {
+                                    i++;
+                                    return true;
+                                } else
+                                    return false;
+                            }
 
+                            public void reset() {
+                                i = -1;
+                            }
 
+                            public void close() {
+                            }
+                        };
+                    }
+                };
+                // noinspection unchecked
+                return (Queryable<T>) queryable;
+            }
+        };
+    }
+}
+```
 
+### 10.4 执行流程
 
+#### 涉及到的类和方法
 
+1. `CalcitePrepareImpl implements CalcitePrepare`
 
+2. `CalcitePrepareImpl#createSqlValidator` create sql validator
 
+3. `CalcitePrepare` API for a service that prepares statements for execution.
 
+4. `CalcitePrepare#prepareSql`
 
+5. `CalcitePrepare#prepareQueryable`
 
+6. `ReflectiveSqlOperatorTable implement SqlOperatorTable`
 
+7. `SqlOperatorTable` SqlOperatorTable defines a directory interface for enumerating and looking up SQL operators and functions.
 
+8. `ReflectiveSqlOperatorTable#init()`Performs post-constructor initialization of an operator table. It can't be part of the consutructor, because the subclass constructor needs to complete first.
+
+9. `SqlStdOperatorTable` containing the standard operators and functions. contains default operators and functions.
 
 

@@ -1,0 +1,4 @@
+Id:VARCHAR Name:VARCHAR Score:INTEGER
+1,John,90
+2,Emily,98
+3,Michael,95

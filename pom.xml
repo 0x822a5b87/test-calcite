@@ -30,6 +30,7 @@
         <module>07-calcite-validate-demo</module>
         <module>08-query-optimization</module>
         <module>09-datasource-access</module>
+        <module>10-sql-extension</module>
         <module>common-csv-access</module>
         <module>javacc</module>
     </modules>
