@@ -41,6 +41,8 @@ public class CsvTable extends AbstractTable implements ScannableTable {
                 String name = str.split(":")[0];
                 String type = str.split(":")[1];
                 names.add(name);
+                System.out.println(type);
+                System.out.println(SqlTypeName.get(type));
                 types.add(relDataTypeFactory.createSqlType(SqlTypeName.get(type)));
             }
         } catch (IOException e) {

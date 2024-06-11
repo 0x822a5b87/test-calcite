@@ -35,6 +35,7 @@
         <module>13-view</module>
         <module>common-csv-access</module>
         <module>javacc</module>
+        <module>principle-and-practice</module>
     </modules>
 
     <dependencyManagement>

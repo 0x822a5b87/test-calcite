@@ -1,6 +1,10 @@
 # test-calcite
 本仓库是 [Calcite数据管理实战](https://www.epubit.com/bookDetails?id=UBc86c6dbe59b2) 一书的读书笔记。
 
+## reference
+
+[Apache Calcite原理与实践](https://liebing.org.cn/collections/calcite/#Apache-Calcite%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5)
+
 ## QA
 
 ### 整个calcite的解析过程是怎么样的？
