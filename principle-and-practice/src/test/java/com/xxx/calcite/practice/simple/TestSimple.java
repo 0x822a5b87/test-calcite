@@ -78,21 +78,30 @@ public class TestSimple {
 
     @Test
     public void testSimple() throws SqlParseException {
-        String sql = "SELECT u.id, name, age, sum(price) " +
-                     "FROM users AS u join orders AS o ON u.id = o.user_id " +
-                     "WHERE age >= 20 AND age <= 30 " +
-                     "GROUP BY u.id, name, age " +
-                     "ORDER BY u.id";
+//        String sql = "SELECT u.id, name, age, sum(price) " +
+//                     "FROM users AS u join orders AS o ON u.id = o.user_id " +
+//                     "WHERE age >= 20 AND age <= 30 " +
+//                     "GROUP BY u.id, name, age " +
+//                     "ORDER BY u.id";
+
+        String sql = "SELECT * from users";
 
         SqlParser.Config c = SqlParser.config()
                                       .withParserFactory(SqlParserImpl.FACTORY)
                                       .withCaseSensitive(false);
         SqlParser sqlParser    = SqlParser.create(sql, c);
         SqlNode   rootNode     = sqlParser.parseQuery();
+
+        System.out.println(rootNode);
+
+        // 验证元数据，例如表名，字段名，函数名和基本数据类型的检查
         SqlNode   validateNode = validator.validate(rootNode);
 
+        System.out.println(validateNode.toString());
+
         // 将SqlNode树转化为RelNode树
-        RelRoot relNode = converter.convertQuery(validateNode, false, true);
+        // 我们也可以不显示的调用 validator.validate(rootNode)，而是通过传递参数 needsValidation = true
+        RelRoot relNode = converter.convertQuery(rootNode, false, true);
         System.out.println(relNode.rel.explain());
         // 优化前
         // LogicalSort(sort0=[$0], dir0=[ASC])

@@ -1,5 +1,131 @@
 # [Apache Calcite原理与实践](https://liebing.org.cn/collections/calcite/#Apache-Calcite%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5)
 
+## 引用
+
+[Relational Model in DBMS](https://www.geeksforgeeks.org/relational-model-in-dbms/)
+
+[Introduction of Relational Algebra in DBMS](https://www.geeksforgeeks.org/introduction-of-relational-algebra-in-dbms/)
+
+[FMPP - FreeMarker-based file PreProcessor](https://fmpp.sourceforge.net)
+
+[Apache Calcite Code Reading Part 1](https://medium.com/@masayuki/calcite-code-reading-part-1-4ff7cdc56959)
+
+[Calcite Code Reading Part 2](https://medium.com/@masayuki/apache-calcite-code-reading-part-2-594e8ca17acf)
+
+[SQL is parsed by SqlParser and convert to SqlNode](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/CalcitePrepareImpl.java#L612)
+
+[Calcite generates a Logical Plan from SqlNodes](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/Prepare.java#L264)
+
+[Calcite generates a Physical plan based on the Logical Plan with planners at optimize phase](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/Prepare.java#L320)
+
+After generated the Physical Plan, [the RelNodes that consist of it process the records](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/Prepare.java#L332)
+
+[Apache Calcite 优化器详解（二）](https://matt33.com/2019/03/17/apache-calcite-planner/)
+
+[SQL 查询优化原理与 Volcano Optimizer 介绍](https://io-meter.com/2018/11/01/sql-query-optimization-volcano/)
+
+## portrayal
+
+### 一次完整的calcite请求可能涉及的类
+
+```mermaid
+---
+title: calcite模块
+---
+
+flowchart LR
+	config --> Parser --> Validator --> Converter --> Optimizer --> Execution
+
+	subgraph config
+		direction LR
+		SqlParser#Config
+		CalciteConnectionConfig
+		CalciteConnectionProperty
+	end
+	
+	subgraph Parser
+		direction LR
+		CalciteSchema
+		Schema
+		Table
+		SqlParser
+		SqlParserImpl
+	end
+	subgraph Validator
+		direction LR
+		CalciteCatalogReader
+		SqlValidator
+		SqlValidator#Config
+	end
+	subgraph Converter
+		direction LR
+		RelOptCluster
+		SqlToRelConverter
+	end
+	subgraph Optimizer
+		direction LR
+		HepPlanner
+		VolcanoPlanner
+		RuleSet
+		Programs
+	end
+	subgraph Execution
+		direction LR	
+	end
+```
+
+
+
+### VolcanoPlanner 优化器的执行流程
+
+接下来就是如何筛选规则了，当把语法树转成RelNode Tree后是没有必要把前面注册的90条优化规则都用上的，所以需要有个筛选的过程，因为每种规则是有应用范围的，按RelNode Tree的不同节点类型就可以筛选出实际需要用到的优化规则了。这一步说起来很简单，但在calcite的代码实现里是相当复杂的，也是非常关键的一步，是从调用`VolcanoPlanner.setRoot`方法开始间接触发的，如果只是静态的看代码不跑起来跟踪调试多半摸不清它的核心流程的。筛选出来的优化规则会封装成`VolcanoRuleMatch`，然后扔到`RuleQueue`里，而这个RuleQueue正是接下来执行动态规划算法要用到的核心类。筛选规则这一步的代码实现很晦涩。
+
+第三步才到VolcanoPlanner.findBestExp，本质上就是一个动态规划算法的实现，但是最值得关注的还是怎么用第二步筛选出来的规则对RelNode Tree进行变换，变换后的形式还是一棵RelNode Tree，最常见的是把LogicalXXX开头的RelNode子类换成了EnumerableXXX或BindableXXX，总而言之，看看具体优化规则的实现就对了，都是繁琐的体力活。
+
+## Relational Model in DBMS
+
+### What is the Relational Model? 
+
+The relational model represents how data is stored in Relational Databases. **A relational database consists of a collection of tables**, each of which is assigned a unique name. Consider a relation STUDENT with attributes ROLL_NO, NAME, ADDRESS, PHONE, and AGE shown in the table. 
+
+| ROLL_NO |  NAME  | ADDRESS |   PHONE    | AGE  |
+| :-----: | :----: | :-----: | :--------: | :--: |
+|    1    |  RAM   |  DELHI  | 9455123451 |  18  |
+|    2    | RAMESH | GURGAON | 9652431543 |  18  |
+|    3    | SUJIT  | ROHTAK  | 9156253131 |  20  |
+|    4    | SURESH |  DELHI  |            |  18  |
+
+### Important Terminologies
+
+- ***\*Attribute:\**** Attributes are the properties that define an entity. e.g.; ***\*ROLL_NO\****, ***\*NAME, ADDRESS\****
+- ***\*Relation Schema:\**** A relation schema defines the structure of the relation and represents the name of the relation with its attributes. e.g.; STUDENT (ROLL_NO, NAME, ADDRESS, PHONE, and AGE) is the relation schema for STUDENT. If a schema has more than 1 relation, it is called Relational Schema.
+- ***\*Tuple:\**** Each row in the relation is known as a tuple. 
+- ***\*Relation Instance:\**** The set of tuples of a relation at a particular instance of time is called a relation instance. 
+- ***\*Degree:\**** The number of attributes in the relation is known as the degree of the relation. The ***\*STUDENT\**** relation defined above has degree 5.
+- **\*Cardinality\***: The number of tuples in a relation is known as cardinality. The STUDENT relation defined above has cardinality 4.
+- ***\*Column:\**** The column represents the set of values for a particular attribute. 
+
+## Introduction of Relational Algebra in DBMS
+
+## Apache Calcite Code Reading Part1
+
+```mermaid
+---
+title: calcite code
+---
+flowchart LR
+
+SqlParser --> LogicalPlan --> PhysicalPlan --> Implement --> Statement[Statement and ResultSet]
+```
+
+1. [Your SQL is parsed by SqlParser and convert to SqlNode](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/CalcitePrepareImpl.java#L612)
+2. [Calcite generates a Logical Plan from SqlNodes](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/Prepare.java#L264)
+3. [Calcite generates a Physical plan based on the Logical Plan with planners at optimize phase](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/Prepare.java#L320)
+4. After generated the Physical Plan, [the RelNodes that consist of it process the records](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/Prepare.java#L332). `EnumerableFilter` filters them with specified conditions and `EnumerableProject` extract specified fields only. These classes of Enumerable Adapter generate a Bindable class on demand in order to processing the records. In this case, finally, `EnumerableCalc`[ do that](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/adapter/enumerable/EnumerableCalc.java#L110).
+5. [Calcite instantiates the previously created class as Bindable](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/adapter/enumerable/EnumerableInterpretable.java#L162). Then [setting it to ](https://github.com/apache/calcite/blob/73023148e7f37d494f6caf92b01b090f6dde13cd/core/src/main/java/org/apache/calcite/prepare/CalcitePrepareImpl.java#L703)`CalciteSignature` and [passing to AvaticaResultSet](https://github.com/apache/calcite-avatica/blob/d52c2036224911d93fe3185f521768037e62a437/core/src/main/java/org/apache/calcite/avatica/AvaticaConnection.java#L660).
+
+## [Calcite Code Reading Part 2](https://medium.com/@masayuki/apache-calcite-code-reading-part-2-594e8ca17acf)
+
 ## [Apache Calcite整体架构及处理流程](https://liebing.org.cn/apache-calcite-overview.html)
 
 ### Calcite整体架构
